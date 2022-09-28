@@ -1,12 +1,11 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 1993-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,8 +22,9 @@ from absl import logging
 import torch
 from torch import nn
 
-from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant
+from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant, lsq_fake_tensor_quant
 from pytorch_quantization.nn.modules.clip import Clip
+from pytorch_quantization.nn.modules.grad_scale import GradScale
 
 from pytorch_quantization import calib
 
@@ -80,7 +80,7 @@ class TensorQuantizer(nn.Module):
         self._unsigned = quant_desc.unsigned
         self._narrow_range = quant_desc.narrow_range
 
-        self._scale = None if not quant_desc.fake_quant else 1.
+        # self._scale = None if not quant_desc.fake_quant else 1.
         self._disabled = disabled
         self._if_quant = if_quant
         self._if_clip = False
@@ -97,6 +97,12 @@ class TensorQuantizer(nn.Module):
             self.enable_clip()
         if if_clip:
             self.enable_clip()
+
+        self._learn_scale = quant_desc._learn_scale
+        if self._learn_scale:
+            self.grad_scale = GradScale(self._num_bits, self._unsigned)
+            self._learn_scale_init = False
+            self._learn_scale_type = quant_desc._learn_scale_type
 
         if quant_desc.calib_method == "histogram":
             logging.info("Creating histogram calibrator")
@@ -117,7 +123,7 @@ class TensorQuantizer(nn.Module):
 
     @property
     def scale(self):
-        if self._fake_quant:
+        if self._fake_quant and (not self._learn_scale):
             logging.error("Fake quantize mode doesn't use scale explicitly!")
         if self._scale is None:
             logging.critical("Accessing scale before quantizing any tensor!")
@@ -256,6 +262,44 @@ class TensorQuantizer(nn.Module):
         self.clip.clip_value_min.data.copy_(-init_amax.data)
         self.clip.clip_value_max.data.copy_(init_amax.data)
 
+    def _lsq_init(self, inputs):
+        if self._axis is not None:
+            mean_dim = [i for i in range(len(inputs.size())) if i != self._axis]
+            init_weight = inputs.abs().mean(dim=mean_dim).reshape(-1, 1, 1, 1)
+        else:
+            init_weight = inputs.abs().mean()
+        value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
+        epsilon = 1. / (1 << 24)
+        if value.min() <= epsilon:
+            zero_amax_mask = (value <= epsilon)
+            value.data[zero_amax_mask] = 1.
+
+        if hasattr(self, '_scale'):
+            del self._scale
+        self.register_parameter('_scale', value)
+
+    def _ptq_init(self):
+        qmax = 2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0
+        value = torch.nn.Parameter((self._amax / qmax) ** 0.5, requires_grad=True)
+        if hasattr(self, '_scale'):
+            del self._scale
+        self.register_parameter('_scale', value)
+
+    def init_learn_scale(self, inputs=None):
+        """Initialize learned scale from PTQ amax or lsq_init"""
+        if self._learn_scale_type == 'lsq_init':
+            if inputs is not None:
+                self._lsq_init(inputs)
+                self._learn_scale_init = True
+            else: 
+                logging.info("LSQ_int needs input is not None, It would be initialized during the first batch!")     
+        elif self._learn_scale_type == 'ptq_init':
+            self._ptq_init()
+            self._learn_scale_init = True
+        else:
+            raise TypeError("Learned-step quantization doesn't support init_type of {}".format(self._learn_scale_type))
+        logging.info("Quant_tensor learning_scale init with {}".format(self._learn_scale_type))
+
     def _get_amax(self, inputs):
         """get amax from buffer or compute it dynamically."""
         if hasattr(self, '_amax'):
@@ -302,12 +346,19 @@ class TensorQuantizer(nn.Module):
         if self._learn_amax:
             inputs = self.clip(inputs)
             amax = torch.max(-self.clip.clip_value_min, self.clip.clip_value_max).detach()
+        elif self._learn_scale:
+            if not self._learn_scale_init:
+                self.init_learn_scale(inputs)
+            scale, self._amax = self.grad_scale(inputs, self._scale)
         else:
             amax = self._get_amax(inputs)
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
-                outputs = fake_tensor_quant(inputs, amax, self._num_bits, self._unsigned, self._narrow_range)
+                if self._learn_scale:
+                    outputs = lsq_fake_tensor_quant(inputs, scale, self._num_bits, self._unsigned, self._narrow_range)
+                else:
+                    outputs = fake_tensor_quant(inputs, amax, self._num_bits, self._unsigned, self._narrow_range)
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
                     raise Exception("Exporting to ONNX in fp16 is not supported. Please export in fp32, i.e. disable AMP.")
@@ -373,7 +424,7 @@ class TensorQuantizer(nn.Module):
         s += " *{}".format(self._scale_amax) if self._scale_amax else ""
         s += " learned" if (self._learn_amax) else ""
         s += " calibrator={}".format(self._calibrator.__class__.__name__) if (self._calibrator is not None) else ""
-        s += " scale={}".format(self._scale) if self._scale is not None else ""
+        s += " scale={}".format(self._scale) if hasattr(self, '_scale') and self._scale is not None else ""
         s += " quant" if (self._if_quant) else ""
         s += " clip" if (self._if_clip) else ""
         s += " calib" if (self._if_calib) else ""

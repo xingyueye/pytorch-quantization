@@ -57,5 +57,23 @@ class ClipFunction(Function):
 
         return grad_input, grad_clip_value_min, grad_clip_value_max
 
+class GradScaleFunction(Function):
+    """An universal gradient scale function
+
+    Multiple grad_scales to gradient for learnable _scale. This is used to balance the parameter updating between
+    conv-weights and quantization-scales
+    """
+
+    @staticmethod
+    def forward(ctx, input, grad_scale):
+        ctx.save_for_backward(input, grad_scale)
+        return input
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input, grad_scale = ctx.saved_tensors
+        grad_input = grad_output * grad_scale
+        return grad_input, None
 
 clip = ClipFunction.apply
+scalegrad = GradScaleFunction.apply

@@ -1,12 +1,11 @@
 #
-# SPDX-FileCopyrightText: Copyright (c) 1993-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -101,6 +100,10 @@ class ScaledQuantDescriptor():
         self._calib_method = kwargs.pop('calib_method', "max")
         self._unsigned = kwargs.pop('unsigned', False)
         self._narrow_range = kwargs.pop('narrow_range', False)
+
+        # add learn_scale configs
+        self._learn_scale = kwargs.pop('_learn_scale', False)
+        self._learn_scale_type = kwargs.pop('_learn_scale_type', 'ptq_init')
 
         if kwargs:
             raise TypeError("Unused keys: {}".format(kwargs.keys()))
@@ -226,9 +229,95 @@ QUANT_DESC_8BIT_CONV1D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(0)
 QUANT_DESC_8BIT_CONV2D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(0))
 QUANT_DESC_8BIT_CONV3D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(0))
 QUANT_DESC_8BIT_LINEAR_WEIGHT_PER_ROW = QuantDescriptor(num_bits=8, axis=(0))
-QUANT_DESC_8BIT_CONVTRANSPOSE1D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(0))
-QUANT_DESC_8BIT_CONVTRANSPOSE2D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(0))
-QUANT_DESC_8BIT_CONVTRANSPOSE3D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(0))
+QUANT_DESC_8BIT_CONVTRANSPOSE1D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(1))
+QUANT_DESC_8BIT_CONVTRANSPOSE2D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(1))
+QUANT_DESC_8BIT_CONVTRANSPOSE3D_WEIGHT_PER_CHANNEL = QuantDescriptor(num_bits=8, axis=(1))
+
+
+class LSQFakeTensorQuantFunction(Function):
+    """A tensor quantization function with learnable scales
+
+    Take an input tensor and its quantization scale, output an quantized tensor. The granularity of scale is the same with the
+    shape of amax.
+    output_dtype indicates whether the quantized value will be stored in integer or float. The reason we want to store
+    it in float is the pytorch function takes the quantized value may not accept integer input, e.g. Conv2D.
+
+    It uses 2^num_bits -1 values instead of 2^num_bits. e.g., for num_bits=8, it uses [-127, 127] instead of [-128, 127]
+    """
+
+    @staticmethod
+    def forward(ctx, inputs, scale, num_bits=8, unsigned=False, narrow_range=True):
+        """
+
+        Follow tensorflow convention, max value is passed in and used to decide scale, instead of inputing scale
+        directly. Though inputing scale directly may be more natural to use.
+
+        Args:
+            ctx: A Context object to store tensors for backward.
+            inputs: A Tensor of type float32.
+            scale: A Tensor of type float32. Inputs will be quantized by scale
+                scale will be broadcasted to inputs tensor.
+            num_bits: A integer used to calculate scaling factor, scale = (2^(num_bits-1) - 1) / max
+                Effectively, it indicates how many integer bits is used to represent the value. Default 8.
+            output_dtype: A type of Tensor. torch.int32 or torch.float32.
+            unsigned: A boolean. Use unsigned integer range. E.g. [0, 255] for num_bits=8. Default False.
+            narrow_range: A boolean. Use symmetric integer range for signed quantization
+                E.g. [-127,127] instead of [-128,127] for num_bits=8. Default True.
+
+        Returns:
+            outputs: A Tensor of type output_dtype.
+
+        Raises:
+            ValueError:
+        """
+        max_bound = torch.tensor((2.0 ** (num_bits - 1 + int(unsigned))) - 1.0, device=scale.device)
+        if unsigned:
+            min_bound = 0
+        elif narrow_range:
+            min_bound = -max_bound
+        else:
+            min_bound = -max_bound - 1
+        ctx.save_for_backward(inputs, scale, max_bound, min_bound)
+        outputs, scale = _tensor_quant_scale(inputs, scale, num_bits, unsigned, narrow_range)
+        return outputs * scale.to(inputs.dtype)
+
+    @staticmethod
+    def backward(ctx, grad_outputs):
+        """
+        Implements straight through estimation as LSQ. For -amax <= input <= amax
+        the gradient passes straight through, otherwise the gradient is zero.
+
+        Args:
+            ctx: A Context object with saved tensors from forward.
+            grad_outputs: A tensor of gradient of outputs.
+
+        Returns:
+            grad_inputs: A tensor of gradient.
+            grad_scale: A tensor of gradient of scale.
+        """
+        inputs, scale, max_bound, min_bound = ctx.saved_tensors
+        if grad_outputs.dtype == torch.half:
+            max_bound = max_bound.half()
+            min_bound = min_bound.half()
+
+        fake_quant_point = inputs / scale
+
+        zero = grad_outputs.new_zeros(1) # create a zero tensor with the same type and device
+        grad_inputs = torch.where((fake_quant_point <= max_bound)*(fake_quant_point >= min_bound), grad_outputs, zero)
+
+        grad_scale = -fake_quant_point + fake_quant_point.round()
+        grad_scale = torch.where(grad_scale >= min_bound, grad_scale, min_bound)
+        grad_scale = torch.where(grad_scale <= max_bound, grad_scale, max_bound)
+        grad_scale = grad_scale * grad_outputs
+        if len(scale.size()) > 0:
+            dim = []
+            for i in range(len(scale.size())):
+                if scale.size()[i] == 1:
+                    dim.append(i)
+            grad_scale = grad_scale.sum(dim=dim, keepdim=True)
+        else:
+            grad_scale = grad_scale.sum()
+        return grad_inputs, grad_scale, None, None, None
 
 
 class TensorQuantFunction(Function):
@@ -312,6 +401,54 @@ class FakeTensorQuantFunction(Function):
         zero = grad_outputs.new_zeros(1)
         grad_inputs = torch.where(inputs.abs() <= amax, grad_outputs, zero)
         return grad_inputs, None, None, None, None
+
+
+def _tensor_quant_scale(inputs, scale, num_bits=8, unsigned=False, narrow_range=True):
+    """Shared function body between TensorQuantFunction and FakeTensorQuantFunction"""
+        # Fine scale, per channel scale will be handled by broadcasting, which could be tricky. Pop a warning.
+    if isinstance(scale, torch.Tensor) and inputs.dim() != scale.dim():
+        logging.debug("scale %s has different shape than inputs %s. Make sure broadcast works as expected!",
+                      scale.size(), inputs.size())
+
+    logging.debug("{} bits quantization on shape {} tensor.".format(num_bits, inputs.size()))
+
+    if unsigned:
+        if inputs.min() < 0.:
+            raise TypeError("Negative values encountered in unsigned quantization.")
+
+    # Computation must be in FP32 to prevent potential over flow.
+    input_dtype = inputs.dtype
+    if inputs.dtype == torch.half:
+        inputs = inputs.float()
+    if scale.dtype == torch.half:
+        scale = scale.float()
+
+    min_scale = scale.min()
+    if min_scale < 0:
+        raise ValueError("Negative values in scale")
+
+    max_bound = torch.tensor((2.0**(num_bits - 1 + int(unsigned))) - 1.0, device=scale.device)
+    if unsigned:
+        min_bound = 0
+    elif narrow_range:
+        min_bound = -max_bound
+    else:
+        min_bound = -max_bound - 1
+
+    epsilon = 1. / (1<<24)
+    if min_scale <= epsilon:  # Treat amax smaller than minimum representable of fp16 0
+        ones_scale_mask = (scale <= epsilon)
+        scale[ones_scale_mask] = 1.  # Value quantized with amax=0 should all be 0
+
+    outputs = torch.clamp((inputs / scale).round_(), min_bound, max_bound)
+
+    if min_scale <= epsilon:
+        scale[ones_scale_mask] = 0  # Return 1 makes more sense for values quantized to 0 with amax=0
+
+    if input_dtype == torch.half:
+        outputs = outputs.half()
+
+    return outputs, scale
 
 def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
     """Shared function body between TensorQuantFunction and FakeTensorQuantFunction"""
@@ -423,4 +560,5 @@ class FakeAffineTensorQuantFunction(Function):
 
 tensor_quant = TensorQuantFunction.apply
 fake_tensor_quant = FakeTensorQuantFunction.apply
+lsq_fake_tensor_quant = LSQFakeTensorQuantFunction.apply
 fake_affine_tensor_quant = FakeAffineTensorQuantFunction.apply
