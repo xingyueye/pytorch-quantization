@@ -30,10 +30,11 @@ class GradScale(nn.Module):
         ValueError:
     """
 
-    def __init__(self, num_bits=8, unsigned=False):
+    def __init__(self, num_bits=8, unsigned=False, use_sqrt=False):
         super(GradScale, self).__init__()
         self.max_bound = 2.0 ** (num_bits - 1 + int(unsigned)) - 1.0
         self._is_init = False
+        self._exp = 2.0 if use_sqrt else 1.0
 
     def init_grad_scale(self, inputs, scale, device):
         numel = inputs.numel() if len(scale.size()) > 0 else inputs.numel() // inputs.size()[0]
@@ -43,6 +44,6 @@ class GradScale(nn.Module):
     def forward(self, inputs, scale):
         if not self._is_init:
             self.init_grad_scale(inputs, scale, inputs.device)
-        scale = scale ** 2
+        scale = scale ** self._exp
         outputs = QF.scalegrad(scale, self._grad_scale)
         return outputs, outputs * self.max_bound

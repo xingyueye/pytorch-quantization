@@ -100,9 +100,9 @@ class TensorQuantizer(nn.Module):
 
         self._learn_scale = quant_desc._learn_scale
         if self._learn_scale:
-            self.grad_scale = GradScale(self._num_bits, self._unsigned)
             self._learn_scale_init = False
             self._learn_scale_type = quant_desc._learn_scale_type
+            self.grad_scale = GradScale(self._num_bits, self._unsigned, use_sqrt=True if self._learn_scale_type == 'stable_lsq' else False)
 
         if quant_desc.calib_method == "histogram":
             logging.info("Creating histogram calibrator")
@@ -262,12 +262,15 @@ class TensorQuantizer(nn.Module):
         self.clip.clip_value_min.data.copy_(-init_amax.data)
         self.clip.clip_value_max.data.copy_(init_amax.data)
 
-    def _lsq_init(self, inputs):
-        if self._axis is not None:
-            mean_dim = [i for i in range(len(inputs.size())) if i != self._axis]
-            init_weight = inputs.abs().mean(dim=mean_dim).reshape(-1, 1, 1, 1)
+    def _lsq_init(self, inputs=None):
+        if inputs is not None:
+            if self._axis is not None:
+                mean_dim = [i for i in range(len(inputs.size())) if i != self._axis]
+                init_weight = inputs.abs().mean(dim=mean_dim).reshape(-1, 1, 1, 1)
+            else:
+                init_weight = inputs.abs().mean()
         else:
-            init_weight = inputs.abs().mean()
+            init_weight = torch.ones(1)
         value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
         epsilon = 1. / (1 << 24)
         if value.min() <= epsilon:
@@ -275,8 +278,9 @@ class TensorQuantizer(nn.Module):
             value.data[zero_amax_mask] = 1.
 
         if hasattr(self, '_scale'):
-            del self._scale
-        self.register_parameter('_scale', value)
+            self._scale.data = value.data
+        else:
+            self.register_parameter('_scale', value)
 
     def _ptq_init(self):
         qmax = 2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0
@@ -287,18 +291,18 @@ class TensorQuantizer(nn.Module):
 
     def init_learn_scale(self, inputs=None):
         """Initialize learned scale from PTQ amax or lsq_init"""
-        if self._learn_scale_type == 'lsq_init':
-            if inputs is not None:
-                self._lsq_init(inputs)
-                self._learn_scale_init = True
-            else: 
-                logging.info("LSQ_int needs input is not None, It would be initialized during the first batch!")     
-        elif self._learn_scale_type == 'ptq_init':
+        if self._learn_scale_type == 'lsq':
+            self._lsq_init(inputs)
+            if inputs is None:
+                logging.info("Scale of activation quantizer would be actually initialized during the first batch!")   
+            else:
+                self._learn_scale_init = True  
+        elif self._learn_scale_type == 'stable_lsq':
             self._ptq_init()
             self._learn_scale_init = True
         else:
             raise TypeError("Learned-step quantization doesn't support init_type of {}".format(self._learn_scale_type))
-        logging.info("Quant_tensor learning_scale init with {}".format(self._learn_scale_type))
+        # logging.info("Quant_tensor learning_scale init with {}".format(self._learn_scale_type))
 
     def _get_amax(self, inputs):
         """get amax from buffer or compute it dynamically."""
@@ -349,6 +353,7 @@ class TensorQuantizer(nn.Module):
         elif self._learn_scale:
             if not self._learn_scale_init:
                 self.init_learn_scale(inputs)
+                self._learn_scale_init=True
             scale, self._amax = self.grad_scale(inputs, self._scale)
         else:
             amax = self._get_amax(inputs)
