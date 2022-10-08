@@ -268,7 +268,7 @@ class TensorQuantizer(nn.Module):
                 mean_dim = [i for i in range(len(inputs.size())) if i != self._axis]
                 init_weight = inputs.abs().mean(dim=mean_dim).reshape(-1, 1, 1, 1)
             else:
-                init_weight = inputs.abs().mean()
+                init_weight = inputs.abs().mean().reshape(1,)
         else:
             init_weight = torch.ones(1)
         value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
