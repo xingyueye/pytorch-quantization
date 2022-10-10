@@ -436,14 +436,8 @@ def _tensor_quant_scale(inputs, scale, num_bits=8, unsigned=False, narrow_range=
         min_bound = -max_bound - 1
 
     epsilon = 1. / (1<<24)
-    if min_scale <= epsilon:  # Treat amax smaller than minimum representable of fp16 0
-        ones_scale_mask = (scale <= epsilon)
-        scale[ones_scale_mask] = 1.  # Value quantized with amax=0 should all be 0
-
+    scale = scale + epsilon
     outputs = torch.clamp((inputs / scale).round_(), min_bound, max_bound)
-
-    if min_scale <= epsilon:
-        scale[ones_scale_mask] = 0  # Return 1 makes more sense for values quantized to 0 with amax=0
 
     if input_dtype == torch.half:
         outputs = outputs.half()
