@@ -266,7 +266,8 @@ class TensorQuantizer(nn.Module):
         if inputs is not None:
             if self._axis is not None:
                 mean_dim = [i for i in range(len(inputs.size())) if i != self._axis]
-                init_weight = inputs.abs().mean(dim=mean_dim).reshape(-1, 1, 1, 1)
+                init_weight = inputs.abs().mean(dim=mean_dim)
+                for i in mean_dim: init_weight = init_weight.unsqueeze(i)
             else:
                 init_weight = inputs.abs().mean().reshape(1,)
         else:
