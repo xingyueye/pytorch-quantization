@@ -436,8 +436,11 @@ def _tensor_quant_scale(inputs, scale, num_bits=8, unsigned=False, narrow_range=
         min_bound = -max_bound - 1
 
     epsilon = 1. / (1<<24)
+    # in case of dividing zero
     scale = scale + epsilon
     outputs = torch.clamp((inputs / scale).round_(), min_bound, max_bound)
+    # restore scale value
+    scale = scale - epsilon
 
     if input_dtype == torch.half:
         outputs = outputs.half()
