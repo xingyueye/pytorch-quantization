@@ -270,9 +270,11 @@ class TensorQuantizer(nn.Module):
                 for i in mean_dim: init_weight = init_weight.unsqueeze(i)
             else:
                 init_weight = inputs.abs().mean().reshape(1,)
+            value = torch.nn.Parameter(
+                init_weight * 2 / ((2.0 ** (self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5),
+                requires_grad=True)
         else:
-            init_weight = torch.ones(1)
-        value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
+            value = torch.nn.Parameter(torch.ones(1), requires_grad=True)
         epsilon = 1. / (1 << 24)
         if value.min() <= epsilon:
             zero_amax_mask = (value <= epsilon)
@@ -295,9 +297,8 @@ class TensorQuantizer(nn.Module):
         if self._learn_scale_type == 'lsq':
             self._lsq_init(inputs)
             if inputs is None:
-                logging.info("Scale of activation quantizer would be actually initialized during the first batch!")   
-            else:
-                self._learn_scale_init = True  
+                logging.info("Scale of activation quantizer is initialized to 1.0 for convenient !")
+            self._learn_scale_init = True
         elif self._learn_scale_type == 'stable_lsq':
             self._ptq_init()
             self._learn_scale_init = True
