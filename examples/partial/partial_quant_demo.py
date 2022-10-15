@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from timm.models import create_model, apply_test_time_pool, load_checkpoint, is_model, list_models
 from timm.data import create_dataset, create_loader, resolve_data_config, RealLabelsImagenet
-from timm.utils import accuracy, AverageMeter, natural_key, setup_default_logging, set_jit_fuser
+from timm.utils import accuracy, AverageMeter, natural_key, setup_default_logging
 
 import sys
 sys.path.append("../../")
@@ -69,7 +69,9 @@ parser.add_argument('--method', type=str, default='entropy', choices=['max', 'en
 parser.add_argument('--sensitivity_method', type=str, default='mse', choices=['mse', 'cosine', 'top1', 'snr'])
 parser.add_argument('--percentile', type=float, default=99.99)
 parser.add_argument('--drop', type=float, default=0.5)
+parser.add_argument('--per_layer_drop', type=float, default=0.2)
 parser.add_argument('--calib_num', type=int, default=4)
+parser.add_argument('--calib_weight', type=str, default=None)
 
 class DataSaverHook:
     """
@@ -160,16 +162,11 @@ def quant_config(args):
         method = 'histogram'
     quant_desc_input = QuantDescriptor(num_bits=args.num_bits, calib_method=method)
     quant_nn.QuantConv2d.set_default_quant_desc_input(quant_desc_input)
+    quant_nn.QuantConvTranspose2d.set_default_quant_desc_input(quant_desc_input)
     quant_nn.QuantLinear.set_default_quant_desc_input(quant_desc_input)
     quant_nn.QuantAdaptiveAvgPool2d.set_default_quant_desc_input(quant_desc_input)
     quant_nn.QuantMaxPool2d.set_default_quant_desc_input(quant_desc_input)
-    if args.per_channel:
-        # initialize weight quant policy, int8 per channel
-        weight_desc = QuantDescriptor(num_bits=args.num_bits, axis=((0,)))
-    else:
-        weight_desc = QuantDescriptor(num_bits=args.num_bits)
-    quant_nn.QuantConv2d.set_default_quant_desc_weight(weight_desc)
-    quant_nn.QuantLinear.set_default_quant_desc_weight(weight_desc)
+    # weight default quant model is perchannel
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -264,7 +261,8 @@ def sensitivity_analyse(model, loader, method, device=None):
 
     for k, m in model.named_modules():
         if isinstance(m, quant_nn.QuantConv2d) or \
-        isinstance(m, quant_nn.QuantConvTranspose2d):
+        isinstance(m, quant_nn.QuantConvTranspose2d) or \
+        isinstance(m, quant_nn.QuantLinear):
             module_quant_enable(model, k)
 
             sensitivity = GetLayerSensitivity(model, m, device)
@@ -287,21 +285,26 @@ def sensitivity_analyse(model, loader, method, device=None):
     model_quant_enable(model)
     return sensitivity_list
 
-def partial_quant(sensitivity_list, model, loader, acc1, ptq_acc1, drop, device=None):
+def partial_quant(sensitivity_list, model, loader, acc1, ptq_acc1, drop, per_layer_drop, device=None):
     disable_layer_list = list()
     partial_acc1 = ptq_acc1
     model_quant_enable(model)
 
+    total_layers = len(sensitivity_list)
+    count = 0
     for layer_name, sensitivity in sensitivity_list:
-        if acc1 - partial_acc1 < drop:
+        if acc1 - partial_acc1 < drop or count >= int(0.1 * total_layers):
             break
         module_quant_disable(model, layer_name)
         partial = validate_model(loader, model)
-        if partial - partial_acc1 < drop * 0.5:
-            break
+        if partial - partial_acc1 < per_layer_drop:
+            # tiny effect, skip
+            module_quant_enable(model, layer_name)
+            continue
         else:
             partial_acc1 = partial
             disable_layer_list.append(layer_name)
+        count += 1
 
     return disable_layer_list, partial_acc1
 
@@ -351,6 +354,7 @@ def main():
         )
 
     data_config = resolve_data_config(vars(args), model=model, use_test_size=True, verbose=True)
+    print(data_config)
     model = model.cuda()
     model.eval()
 
@@ -364,6 +368,7 @@ def main():
         train_dataset,
         input_size=data_config['input_size'],
         batch_size=args.batch_size,
+        is_training=True,
         use_prefetcher=True,
         interpolation=data_config['interpolation'],
         mean=data_config['mean'],
@@ -373,14 +378,14 @@ def main():
         pin_memory=False,
         tf_preprocessing=False)
 
-    dataset = create_dataset(
+    val_dataset = create_dataset(
         root=args.data, 
         name=args.dataset, 
         split="validation",
         download=args.dataset_download)
 
-    loader = create_loader(
-        dataset,
+    val_loader = create_loader(
+        val_dataset,
         input_size=data_config['input_size'],
         batch_size=args.batch_size,
         use_prefetcher=True,
@@ -411,28 +416,32 @@ def main():
         pin_memory=False,
         tf_preprocessing=False)
 
-    with torch.no_grad():
-        collect_stats(model, train_loader, args.calib_num)
-        compute_amax(model, method=args.method, percentile=args.percentile)
+    if args.calib_weight is None:
+        with torch.no_grad():
+            collect_stats(model, train_loader, args.calib_num)
+            compute_amax(model, method=args.method, percentile=args.percentile)
+        torch.save(model.state_dict(), args.model + '_calib.pth')
+    else:
+        model.load_state_dict(torch.load(args.calib_weight).state_dict())
 
     model_quant_disable(model)
-    ori_acc1 = validate_model(loader, model)
+    ori_acc1 = validate_model(val_loader, model)
 
     model_quant_enable(model)
-    quant_acc1 = validate_model(loader, model)
+    quant_acc1 = validate_model(val_loader, model)
 
     if ori_acc1 - quant_acc1 > args.drop:
         if args.sensitivity_method == 'top1':
             top1_list = top1_sensitivity(model, mini_loader)
             top1_list.sort(key=lambda tup: tup[1], reverse=False)
             print(top1_list)
-            skip_layers, partial_acc1 = partial_quant(top1_list, model, loader, ori_acc1, quant_acc1, args.drop)
+            skip_layers, partial_acc1 = partial_quant(top1_list, model, val_loader, ori_acc1, quant_acc1, args.drop, args.per_layer_drop)
             write_results(args.model + "_top1_quant.txt", args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
         else:
-            mse_list = sensitivity_analyse(model, loader, args.sensitivity_method)
+            mse_list = sensitivity_analyse(model, val_loader, args.sensitivity_method)
             mse_list.sort(key=lambda tup: tup[1], reverse=True)
             print(mse_list)
-            skip_layers, partial_acc1 = partial_quant(mse_list, model, loader, ori_acc1, quant_acc1, args.drop)
+            skip_layers, partial_acc1 = partial_quant(mse_list, model, val_loader, ori_acc1, quant_acc1, args.drop, args.per_layer_drop)
             write_results(args.model + "_mse_quant.txt", args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
     else:
         write_results(args.model + "_quant.txt", args.model, ori_acc1, quant_acc1)
