@@ -422,7 +422,7 @@ def main():
             compute_amax(model, method=args.method, percentile=args.percentile)
         torch.save(model.state_dict(), args.model + '_calib.pth')
     else:
-        model.load_state_dict(torch.load(args.calib_weight).state_dict())
+        model.load_state_dict(torch.load(args.calib_weight))
 
     model_quant_disable(model)
     ori_acc1 = validate_model(val_loader, model)
