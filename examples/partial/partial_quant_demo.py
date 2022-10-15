@@ -27,7 +27,7 @@ from pytorch_quantization.tensor_quant import QuantDescriptor
 from pytorch_quantization import quant_modules
 from pytorch_quantization import tensor_quant
 
-parser = argparse.ArgumentParser(description='PyTorch ImageNet Validation')
+parser = argparse.ArgumentParser(description='PyTorch Partial Quantiztion Demo')
 parser.add_argument('--data', metavar='DIR',
                     help='path to dataset')
 parser.add_argument('--dataset', '-d', metavar='NAME', default='',
@@ -42,28 +42,11 @@ parser.add_argument('-j', '--workers', default=6, type=int, metavar='N',
                     help='number of data loading workers (default: 2)')
 parser.add_argument('-b', '--batch-size', default=32, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
-parser.add_argument('--img-size', default=None, type=int,
-                    metavar='N', help='Input image dimension, uses model default if empty')
-parser.add_argument('--input-size', default=None, nargs=3, type=int,
-                    metavar='N N N', help='Input all image dimensions (d h w, e.g. --input-size 3 224 224), uses model default if empty')
-parser.add_argument('--crop-pct', default=None, type=float,
-                    metavar='N', help='Input image center crop pct')
-parser.add_argument('--mean', type=float, nargs='+', default=None, metavar='MEAN',
-                    help='Override mean pixel value of dataset')
-parser.add_argument('--std', type=float,  nargs='+', default=None, metavar='STD',
-                    help='Override std deviation of of dataset')
-parser.add_argument('--interpolation', default='', type=str, metavar='NAME',
-                    help='Image resize interpolation type (overrides model)')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
-parser.add_argument('--num-gpu', type=int, default=1,
-                    help='Number of GPUS to use')
-parser.add_argument('--export', action='store_true', default=False,
-                    help='export onnx model.')
 parser.add_argument('--num-classes', type=int, default=None,
                     help='Number classes in dataset')
 
-parser.add_argument('--per_channel', dest='per_channel', action='store_true')
 parser.add_argument('--num_bits', type=int, default=8)
 parser.add_argument('--method', type=str, default='entropy', choices=['max', 'entropy', 'percentile', 'mse'])
 parser.add_argument('--sensitivity_method', type=str, default='mse', choices=['mse', 'cosine', 'top1', 'snr'])
@@ -339,8 +322,7 @@ def write_results(filename, arch, acc1, quant_acc1, skip_layers=None, partial_ac
             for layer in skip_layers:
                 cf.write(layer + '\n')
 
-def main():
-    args = parser.parse_args()
+def main(args):
     quant_modules.initialize()
     quant_config(args)
 
@@ -447,4 +429,5 @@ def main():
         write_results(args.model + "_quant.txt", args.model, ori_acc1, quant_acc1)
 
 if __name__ == '__main__':
-    main()
+    args = parser.parse_args()
+    main(args)
