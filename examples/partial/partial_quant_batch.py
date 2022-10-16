@@ -16,6 +16,8 @@ parser.add_argument('--batch-size', default=32, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--pretrained_path', default=None, type=str,
                     help='path to pretrained weights')
+parser.add_argument('--output_path', default='./', type=str,
+                    help='path to save results')
 
 parser.add_argument('--method', type=str, default='entropy', choices=['max', 'entropy', 'percentile', 'mse'])
 parser.add_argument('--sensitivity_method', type=str, default='mse', choices=['mse', 'cosine', 'top1', 'snr'])
@@ -33,11 +35,13 @@ def partial_quant(args):
     for k, v in timm_urls.timm_urls.items():
         model_name = k
         weight_url = v[0]
-        print("Step1 Download model {} from url {}".format(model_name, weight_url))
-        # Download pretrained weights
-        download_cmd = 'wget {} -P {}'.format(weight_url, args.pretrained_path)
-        print(download_cmd)
-        os.system(download_cmd)
+        weight_name = os.path.basename(weight_url)
+        if not os.path.exists(os.path.join(args.pretrained_path, weight_name)):
+            print("Step1 Download model {} from url {}".format(model_name, weight_url))
+            # Download pretrained weights
+            download_cmd = 'wget {} -P {}'.format(weight_url, args.pretrained_path)
+            print(download_cmd)
+            os.system(download_cmd)
 
         print("Step2 Do partial quantization...")
         PARTIAL_QUANT_FILENAME = 'partial_quant_demo.py'
@@ -45,10 +49,10 @@ def partial_quant(args):
         command_list = [sys.executable, PARTIAL_QUANT_FILENAME,
                         '--data', args.data, '--pretrained',
                         '--split', args.split, '--model', model_name,
-                        '--batch_size', args.batch_size, '--calib_num', args.calib_num,
-                        '--method', args.method, '--sensitivity_method', args.senstivity_methd,
-                        '--drop', args.drop, '--per_layer_drop', args.per_layer_drop,
-                        '--workers', args.workers]
+                        '--batch-size', str(args.batch_size), '--calib_num', str(args.calib_num),
+                        '--method', args.method, '--sensitivity_method', args.sensitivity_method,
+                        '--drop', str(args.drop), '--per_layer_drop', str(args.per_layer_drop),
+                        '--workers', str(args.workers), '--output', args.output_path]
 
         print(command_list)
         with open(log_file, 'w') as file_id:
@@ -57,5 +61,6 @@ def partial_quant(args):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    partial_quant(args)
 
 

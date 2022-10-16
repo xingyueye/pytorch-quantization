@@ -46,6 +46,8 @@ parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
 parser.add_argument('--num-classes', type=int, default=None,
                     help='Number classes in dataset')
+parser.add_argument('--output', type=str, default='./',
+                    help='output directory of results')
 
 parser.add_argument('--num_bits', type=int, default=8)
 parser.add_argument('--method', type=str, default='entropy', choices=['max', 'entropy', 'percentile', 'mse'])
@@ -280,6 +282,7 @@ def partial_quant(sensitivity_list, model, loader, acc1, ptq_acc1, drop, per_lay
             break
         module_quant_disable(model, layer_name)
         partial = validate_model(loader, model)
+        '''
         if partial - partial_acc1 < per_layer_drop:
             # tiny effect, skip
             module_quant_enable(model, layer_name)
@@ -287,6 +290,9 @@ def partial_quant(sensitivity_list, model, loader, acc1, ptq_acc1, drop, per_lay
         else:
             partial_acc1 = partial
             disable_layer_list.append(layer_name)
+        '''
+        partial_acc1 = partial
+        disable_layer_list.append(layer_name)
         count += 1
 
     return disable_layer_list, partial_acc1
@@ -412,21 +418,23 @@ def main(args):
     model_quant_enable(model)
     quant_acc1 = validate_model(val_loader, model)
 
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
     if ori_acc1 - quant_acc1 > args.drop:
         if args.sensitivity_method == 'top1':
             top1_list = top1_sensitivity(model, mini_loader)
             top1_list.sort(key=lambda tup: tup[1], reverse=False)
             print(top1_list)
             skip_layers, partial_acc1 = partial_quant(top1_list, model, val_loader, ori_acc1, quant_acc1, args.drop, args.per_layer_drop)
-            write_results(args.model + "_top1_quant.txt", args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
+            write_results(os.path.join(args.output, args.model + "_top1_quant.txt"), args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
         else:
             mse_list = sensitivity_analyse(model, val_loader, args.sensitivity_method)
             mse_list.sort(key=lambda tup: tup[1], reverse=True)
             print(mse_list)
             skip_layers, partial_acc1 = partial_quant(mse_list, model, val_loader, ori_acc1, quant_acc1, args.drop, args.per_layer_drop)
-            write_results(args.model + "_mse_quant.txt", args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
+            write_results(os.path.join(args.output, args.model + "_mse_quant.txt"), args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
     else:
-        write_results(args.model + "_quant.txt", args.model, ori_acc1, quant_acc1)
+        write_results(os.path.join(args.output, args.model + "_quant.txt"), args.model, ori_acc1, quant_acc1)
 
 if __name__ == '__main__':
     args = parser.parse_args()
