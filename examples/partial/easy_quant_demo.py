@@ -246,70 +246,59 @@ def validate_model(val_loader, model, ptq=False, device=None, print_freq=100):
     return top1.avg
 
 
-def get_layer_in_out(model, input, device: torch.device):
+def get_layer_in_out(model, name, input, device: torch.device):
     model.eval()
     model_quant_disable(model)
 
-    handle_list = []
     layer_in_out = dict()
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.QuantConv2d) or \
-            isinstance(module, quant_nn.QuantLinear) or \
-            isinstance(module, quant_nn.QuantConvTranspose2d):
-            layer_in_out[name] = DataSaverHook(store_input=True, store_output=True)
-            handle_list.append(module.register_forward_hook(layer_in_out[name]))
+    layer_in_out[name] = DataSaverHook(store_input=True, store_output=True)
+
+    layer = get_module(model, name)
+    handle = layer.register_forward_hook(layer_in_out[name])
 
     with torch.no_grad():
         _ = model(input.to(device))
 
-    for handle in handle_list:
-        handle.remove()
+    handle.remove()
 
     return layer_in_out
 
 
-def scale_search(model, layer_in_out, device=None):
+def scale_search(model, images, device=None):
     model.eval()
     model.to(device)
     model_quant_disable(model)
 
-    for name, in_out in layer_in_out.items():
-        module_quant_enable(model, name)
-        layer = get_module(model, name)
-        amax_orig = layer._input_quantizer._amax.detach().item()
-        scale_orig =  amax_orig / 127.0
-        scale_start, scale_end = 0.5 * scale_orig, 2.0 * scale_orig
-        scale_interval = (scale_end - scale_start) / 100.0
-        similarity_list = []
-        scale_list = []
-        print("Amax orig={:.4f}, amax start={:.4f} amax end={:.4f}, amax intval={:.4f}".format(scale_orig*127.0,
-                                                                                               scale_start*127.0,
-                                                                                               scale_end*127.0,
-                                                                                               scale_interval*127.0))
-        print("Search layer {} amax...".format(name))
-        # search best scale
-        for i in tqdm(range(100)):
-            scale_tmp = scale_start + i*scale_interval
-            scale_list.append(scale_tmp)
-            amax_tmp = scale_tmp * 127.0
-            layer._input_quantizer._amax.fill_(amax_tmp)
-            with torch.no_grad():
-                output = layer(in_out.input_store[0].detach().to(device))
-            similarity_error = torch_cosine_error(output.detach().cpu(), in_out.output_store.detach().cpu())
-            similarity_list.append(similarity_error)
+    for name, layer in model.named_modules():
+        # check layer
+        if isinstance(layer, quant_nn.QuantConv2d) or \
+        isinstance(layer, quant_nn.QuantConvTranspose2d) or \
+        isinstance(layer, quant_nn.QuantLinear):
+            module_quant_enable(model, name)
+            in_out = get_layer_in_out(model, name, images, device)
+            amax_orig = layer._input_quantizer._amax.detach().item()
+            scale_orig =  amax_orig / 127.0
+            scale_start, scale_end = 0.5 * scale_orig, 2.0 * scale_orig
+            scale_interval = (scale_end - scale_start) / 100
+            similarity_list = []
+            # search best scale
+            for i in range(100):
+                amax_tmp = (scale_start + i*scale_interval) * 127.0
+                layer._input_quantizer._amax.fill_(amax_tmp)
+                with torch.no_grad():
+                    output = layer(in_out[name].input_store.detach().to(device))
+                similarity = torch_cosine_error(output.detach().cpu(), in_out[name].output_store.detach().cpu())
+                similarity_list.append(similarity)
 
-        similarity_np = np.array(similarity_list)
-        idx_best = similarity_np.argsort()[0]
-        scale_best = scale_list[idx_best]
-        amax_best = scale_best * 127.0
-        print("Modify layer {} amax from {:.6f} to {:.6f}".format(name, amax_orig, amax_best))
-        layer._input_quantizer._amax.fill_(amax_best)
-        module_quant_disable(model, name)
+            similarity_np = np.array(similarity_list)
+            scale_best = similarity_np.argsort()[::-1][0]
+            amax_best = scale_best * 127.0
+            print("Modify {} amax from {:.6f} to {:.6f}".format(name, amax_orig, amax_best))
+            layer._input_quantizer._amax.fill_(amax_best)
 
 
 def easy_quant(model, images, device):
-    layer_in_out = get_layer_in_out(model, images, device)
-    scale_search(model, layer_in_out, device)
+    scale_search(model, images, device)
 
 
 def write_results(filename, arch, acc1, quant_acc1, skip_layers=None, partial_acc1=None):
