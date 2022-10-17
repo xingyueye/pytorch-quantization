@@ -246,9 +246,7 @@ def validate_model(val_loader, model, ptq=False, device=None, print_freq=100):
     return top1.avg
 
 
-def get_layer_in_out(model, name, input, device: torch.device):
-    model.eval()
-    model_quant_disable(model)
+def get_layer_in_out(model, name, inputs, device: torch.device):
 
     layer_in_out = dict()
     layer_in_out[name] = DataSaverHook(store_input=True, store_output=True)
@@ -257,7 +255,7 @@ def get_layer_in_out(model, name, input, device: torch.device):
     handle = layer.register_forward_hook(layer_in_out[name])
 
     with torch.no_grad():
-        _ = model(input.to(device))
+        _ = model(inputs.to(device))
 
     handle.remove()
 
@@ -281,17 +279,20 @@ def scale_search(model, images, device=None):
             scale_start, scale_end = 0.5 * scale_orig, 2.0 * scale_orig
             scale_interval = (scale_end - scale_start) / 100
             similarity_list = []
+            scale_list = []
             # search best scale
-            for i in range(100):
-                amax_tmp = (scale_start + i*scale_interval) * 127.0
+            print("Search layer {} scale...".format(name))
+            for i in tqdm(range(100)):
+                scale_tmp = scale_start + i*scale_interval
+                amax_tmp = (scale_tmp) * 127.0
                 layer._input_quantizer._amax.fill_(amax_tmp)
                 with torch.no_grad():
-                    output = layer(in_out[name].input_store.detach().to(device))
+                    output = layer(in_out[name].input_store[0].detach().to(device))
                 similarity = torch_cosine_error(output.detach().cpu(), in_out[name].output_store.detach().cpu())
                 similarity_list.append(similarity)
-
+                scale_list.append(scale_tmp)
             similarity_np = np.array(similarity_list)
-            scale_best = similarity_np.argsort()[::-1][0]
+            scale_best = scale_list[similarity_np.argsort()[0]]
             amax_best = scale_best * 127.0
             print("Modify {} amax from {:.6f} to {:.6f}".format(name, amax_orig, amax_best))
             layer._input_quantizer._amax.fill_(amax_best)
