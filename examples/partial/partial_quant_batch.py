@@ -77,7 +77,7 @@ def partial_analyse(args):
                 float(lines[2].strip('\n')), float(lines[3].strip('\n'))
                 diff_acc = round(fp32_acc - ptq_acc, 4)
                 # quant_str = name + " " + str(fp32_acc) + " " + str(ptq_acc) + " " + str(diff_acc) + '\n'
-                quant_str = "{}\t\t{:.4f} {:.4f} {:.4f}".format(name, fp32_acc, ptq_acc, diff_acc)
+                quant_str = "{}\t\t{:.4f} {:.4f} {:.4f}\n".format(name, fp32_acc, ptq_acc, diff_acc)
                 cfid.write(quant_str)
         elif os.path.exists(partial_file):
             with open(partial_file, 'r') as pfid:
