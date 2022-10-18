@@ -272,7 +272,7 @@ class LSQFakeTensorQuantFunction(Function):
         """
         max_bound = torch.tensor((2.0 ** (num_bits - 1 + int(unsigned))) - 1.0, device=scale.device)
         if unsigned:
-            min_bound = 0
+            min_bound = torch.tensor(0.0, device=scale.device)
         elif narrow_range:
             min_bound = -max_bound
         else:
@@ -429,7 +429,7 @@ def _tensor_quant_scale(inputs, scale, num_bits=8, unsigned=False, narrow_range=
 
     max_bound = torch.tensor((2.0**(num_bits - 1 + int(unsigned))) - 1.0, device=scale.device)
     if unsigned:
-        min_bound = 0
+        min_bound = torch.tensor(0.0, device=scale.device)
     elif narrow_range:
         min_bound = -max_bound
     else:
@@ -473,7 +473,7 @@ def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
 
     max_bound = torch.tensor((2.0**(num_bits - 1 + int(unsigned))) - 1.0, device=amax.device)
     if unsigned:
-        min_bound = 0
+        min_bound = torch.tensor(0.0, device=amax.device)
     elif narrow_range:
         min_bound = -max_bound
     else:
