@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import subprocess
+import glob
 
 import timm_urls
 
@@ -26,6 +27,9 @@ parser.add_argument('--drop', type=float, default=0.5)
 parser.add_argument('--per_layer_drop', type=float, default=0.2)
 parser.add_argument('--calib_num', type=int, default=4)
 parser.add_argument('--calib_weight', type=str, default=None)
+
+parser.add_argument('--analyse_only', default=False, action='store_true',
+                    help='analyse partial quantization results')
 
 def partial_quant(args):
     if not os.path.exists(args.pretrained_path):
@@ -59,8 +63,41 @@ def partial_quant(args):
             subp = subprocess.Popen(command_list, stdout=file_id, stderr=file_id)
             subp.communicate()
 
+def partial_analyse(args):
+    collection_file = 'partial_quant_collection_{}.txt'.format(args.sensitivity_method)
+    cfid = open(collection_file, 'w')
+
+    for k, v in timm_urls.timm_urls.items():
+        quant_file = os.path.join(os.path.output, k + '_quant.txt')
+        partial_file = os.path.join(os.path.output, k + '_' + args.sensitivity_method + '_quant.txt')
+        if os.path.exists(quant_file):
+            with open(quant_file, 'r') as qfid:
+                lines = qfid.readlines()
+                _, name, fp32_acc, ptq_acc = lines[0].strip('\n'), lines[1].strip('\n'), \
+                float(lines[2].strip('\n')), float(lines[3].strip('\n'))
+                diff_acc = fp32_acc - ptq_acc
+                quant_str = name + " " + str(fp32_acc) + " " + str(ptq_acc) + " " + str(diff_acc) + '\n'
+                cfid.write(quant_str)
+        elif os.path.exists(partial_file):
+            with open(partial_file, 'r') as pfid:
+                lines = pfid.readlines()
+                lines_num = len(lines)
+                _, name, fp32_acc, ptq_acc, part_acc = lines[0].strip('\n'), lines[1].strip('\n'), \
+                float(lines[2].strip('\n')), float(lines[3].strip('\n')), float(lines[4].strip('\n'))
+                diff_acc = fp32_acc - part_acc
+                part_str = name + " " + str(fp32_acc) + " " + str(ptq_acc) + " " + \
+                           str(part_acc) + " " + str(diff_acc)
+                for idx in range(5, lines_num):
+                    part_str = part_str + " " + lines[idx].strip('\n')
+                part_str = part_str + "\n"
+                cfid.write(part_str)
+    cfid.close()
+
+
 if __name__ == '__main__':
     args = parser.parse_args()
-    partial_quant(args)
+    if args.analyse_only is False:
+        partial_quant(args)
+    partial_analyse(args)
 
 
