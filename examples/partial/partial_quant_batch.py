@@ -68,14 +68,14 @@ def partial_analyse(args):
     cfid = open(collection_file, 'w')
 
     for k, v in timm_urls.timm_urls.items():
-        quant_file = os.path.join(os.path.output, k + '_quant.txt')
-        partial_file = os.path.join(os.path.output, k + '_' + args.sensitivity_method + '_quant.txt')
+        quant_file = os.path.join(args.output_path, k + '_quant.txt')
+        partial_file = os.path.join(args.output_path, k + '_' + args.sensitivity_method + '_quant.txt')
         if os.path.exists(quant_file):
             with open(quant_file, 'r') as qfid:
                 lines = qfid.readlines()
                 _, name, fp32_acc, ptq_acc = lines[0].strip('\n'), lines[1].strip('\n'), \
                 float(lines[2].strip('\n')), float(lines[3].strip('\n'))
-                diff_acc = fp32_acc - ptq_acc
+                diff_acc = round(fp32_acc - ptq_acc, 4)
                 quant_str = name + " " + str(fp32_acc) + " " + str(ptq_acc) + " " + str(diff_acc) + '\n'
                 cfid.write(quant_str)
         elif os.path.exists(partial_file):
@@ -84,7 +84,7 @@ def partial_analyse(args):
                 lines_num = len(lines)
                 _, name, fp32_acc, ptq_acc, part_acc = lines[0].strip('\n'), lines[1].strip('\n'), \
                 float(lines[2].strip('\n')), float(lines[3].strip('\n')), float(lines[4].strip('\n'))
-                diff_acc = fp32_acc - part_acc
+                diff_acc = round(fp32_acc - part_acc, 4)
                 part_str = name + " " + str(fp32_acc) + " " + str(ptq_acc) + " " + \
                            str(part_acc) + " " + str(diff_acc)
                 for idx in range(5, lines_num):
