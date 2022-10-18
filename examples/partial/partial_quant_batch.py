@@ -19,6 +19,8 @@ parser.add_argument('--pretrained_path', default=None, type=str,
                     help='path to pretrained weights')
 parser.add_argument('--output_path', default='./', type=str,
                     help='path to save results')
+parser.add_argument('--log_path', default='./', type=str,
+                    help='path to save logs')
 
 parser.add_argument('--method', type=str, default='entropy', choices=['max', 'entropy', 'percentile', 'mse'])
 parser.add_argument('--sensitivity_method', type=str, default='mse', choices=['mse', 'cosine', 'top1', 'snr'])
@@ -36,6 +38,10 @@ def partial_quant(args):
         print("Create dir {}".format(args.pretrained_path))
         os.makedirs(args.pretrained_path)
 
+    if not os.path.exists(args.log_path):
+        print("Create dir {}".format(args.log_path))
+        os.makedirs(args.log_path)
+
     for k, v in timm_urls.timm_urls.items():
         model_name = k
         weight_url = v[0]
@@ -49,7 +55,7 @@ def partial_quant(args):
 
         print("Step2 Do partial quantization...")
         PARTIAL_QUANT_FILENAME = 'partial_quant_demo.py'
-        log_file = "{}_partial_quantization.txt".format(model_name)
+        log_file = os.path.join(args.log_path, "{}_partial_quantization.txt".format(model_name))
         command_list = [sys.executable, PARTIAL_QUANT_FILENAME,
                         '--data', args.data, '--pretrained',
                         '--split', args.split, '--model', model_name,
