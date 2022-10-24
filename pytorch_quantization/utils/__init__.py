@@ -19,3 +19,5 @@
 """Main entry of all utils"""
 
 from .reduce_amax import reduce_amax
+from .reduce_amax import reduce_amax_mean
+

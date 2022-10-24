@@ -232,7 +232,10 @@ class TensorQuantizer(nn.Module):
         strict = kwargs.pop("strict", True)
         if getattr(self, '_calibrator', None) is None:
             raise RuntimeError("Calibrator not created.")
-        calib_amax = self._calibrator.compute_amax(*args, **kwargs)
+        if self._learn_scale_type == 'lsq':
+            calib_amax = self._calibrator.compute_amax_lsq()
+        else:
+            calib_amax = self._calibrator.compute_amax(*args, **kwargs)
         if calib_amax is None:
             err_msg = "Calibrator returned None. This usually happens when calibrator hasn't seen any tensor."
             if not strict:
@@ -263,18 +266,8 @@ class TensorQuantizer(nn.Module):
         self.clip.clip_value_max.data.copy_(init_amax.data)
 
     def _lsq_init(self, inputs=None):
-        if inputs is not None:
-            if self._axis is not None:
-                mean_dim = [i for i in range(len(inputs.size())) if i != self._axis]
-                init_weight = inputs.abs().mean(dim=mean_dim)
-                for i in mean_dim: init_weight = init_weight.unsqueeze(i)
-            else:
-                init_weight = inputs.abs().mean().reshape(1,)
-            value = torch.nn.Parameter(
-                init_weight * 2 / ((2.0 ** (self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5),
-                requires_grad=True)
-        else:
-            value = torch.nn.Parameter(torch.ones(1), requires_grad=True)
+        init_weight = self._amax
+        value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
         epsilon = 1. / (1 << 24)
         if value.min() <= epsilon:
             zero_amax_mask = (value <= epsilon)
@@ -296,9 +289,10 @@ class TensorQuantizer(nn.Module):
         """Initialize learned scale from PTQ amax or lsq_init"""
         if self._learn_scale_type == 'lsq':
             self._lsq_init(inputs)
-            if inputs is None:
-                logging.info("Scale of activation quantizer is initialized to 1.0 for convenient !")
-            self._learn_scale_init = True
+            # if inputs is None:
+            #     logging.info("Scale of activation quantizer would be actually initialized during the first batch!")   
+            # else:
+            self._learn_scale_init = True  
         elif self._learn_scale_type == 'stable_lsq':
             self._ptq_init()
             self._learn_scale_init = True
@@ -393,7 +387,10 @@ class TensorQuantizer(nn.Module):
             if self._calibrator is None:
                 raise RuntimeError("Calibrator was not created.")
             # Shape is only know when it sees the first tensor
-            self._calibrator.collect(inputs)
+            if self._learn_scale_type == 'lsq':
+                self._calibrator.lsq_collect(inputs)
+            else:
+                self._calibrator.collect(inputs)
 
         if self._if_clip:
             if not self._learn_amax:
