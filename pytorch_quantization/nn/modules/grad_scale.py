@@ -37,7 +37,8 @@ class GradScale(nn.Module):
         self.sqrt_scale = use_sqrt
 
     def init_grad_scale(self, inputs, scale, device):
-        numel = inputs.numel() if len(scale.size()) > 0 else inputs.numel() // inputs.size()[0]
+        # numel = inputs.numel() if len(scale.size()) > 0 else inputs.numel() // inputs.size()[0]
+        numel = inputs.numel()
         self._grad_scale = torch.tensor(1.0 / ((self.max_bound * numel) ** 0.5), device=device)
         self._is_init = True
 
