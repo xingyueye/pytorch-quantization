@@ -232,7 +232,7 @@ class TensorQuantizer(nn.Module):
         strict = kwargs.pop("strict", True)
         if getattr(self, '_calibrator', None) is None:
             raise RuntimeError("Calibrator not created.")
-        if self._learn_scale_type == 'lsq':
+        if self._learn_scale and self._learn_scale_type == 'lsq':
             calib_amax = self._calibrator.compute_amax_lsq()
         else:
             calib_amax = self._calibrator.compute_amax(*args, **kwargs)
@@ -387,7 +387,7 @@ class TensorQuantizer(nn.Module):
             if self._calibrator is None:
                 raise RuntimeError("Calibrator was not created.")
             # Shape is only know when it sees the first tensor
-            if self._learn_scale_type == 'lsq':
+            if self._learn_scale and self._learn_scale_type == 'lsq':
                 self._calibrator.lsq_collect(inputs)
             else:
                 self._calibrator.collect(inputs)
