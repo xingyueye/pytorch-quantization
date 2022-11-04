@@ -57,6 +57,8 @@ parser.add_argument('--drop', type=float, default=0.5)
 parser.add_argument('--per_layer_drop', type=float, default=0.2)
 parser.add_argument('--calib_num', type=int, default=4)
 parser.add_argument('--calib_weight', type=str, default=None)
+parser.add_argument('--save_qdq_onnx', action='store_true',
+                    help='use pre-trained model')
 
 class DataSaverHook:
     """
@@ -411,6 +413,18 @@ def main(args):
         torch.save(model.state_dict(), args.model + '_calib.pth')
     else:
         model.load_state_dict(torch.load(args.calib_weight))
+
+    if args.save_qdq_onnx:
+        quant_nn.TensorQuantizer.use_fb_fake_quant = True
+        onnx_model = "%s.onnx" % args.model
+        data_shape = (args.batch_size,) + data_config['input_size']
+        imgs = torch.randn(data_shape).cuda()
+        torch.onnx.export(model, imgs, onnx_model,
+                            input_names=['input'],
+                            output_names=['output'],
+                            verbose=False,
+                            opset_version=13,
+                            operator_export_type=torch.onnx.OperatorExportTypes.ONNX)
 
     model_quant_disable(model)
     ori_acc1 = validate_model(val_loader, model)
