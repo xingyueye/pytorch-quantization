@@ -1,0 +1,98 @@
+'resnet18d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet18d_calib.pth', 0
+'resnet26','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet26_calib.pth', 0
+'resnet26d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet26d_calib.pth', 1
+'resnet26t','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet26t_calib.pth', 0
+'resnet34','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet34_calib.pth', 0
+'resnet34d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet34d_calib.pth', 0
+'resnet50','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet50_calib.pth', 5
+'resnet50d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet50d_calib.pth', 0
+'resnetblur50','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnetblur50_calib.pth', 4
+'resnet101','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet101_calib.pth', 10
+'resnet101d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnet101d_calib.pth', 0
+'resnetrs50','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnetrs50_calib.pth', 0
+'resnetrs101','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnetrs101_calib.pth', 0
+'resnetrs152','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnetrs152_calib.pth', 0
+'resnetrs270','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnetrs270_calib.pth', 0
+'resnext50_32x4d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnext50_32x4d_calib.pth', 5
+'resnext50d_32x4d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnext50d_32x4d_calib.pth', 1
+'efficientnet_b0','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_b0_calib.pth', 8
+'efficientnet_b1','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_b1_calib.pth', 10
+'efficientnet_b2','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_b2_calib.pth', 11
+'efficientnet_b3','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_b3_calib.pth', 13
+'efficientnet_lite0','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_lite0_calib.pth', 0
+'tinynet_a','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/tinynet_a_calib.pth', 9
+'tinynet_b','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/tinynet_b_calib.pth', 8
+'tinynet_c','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/tinynet_c_calib.pth', 7
+'fbnetc_100','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/fbnetc_100_calib.pth', 6
+'fbnetv3_b','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/fbnetv3_b_calib.pth', 12
+'fbnetv3_d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/fbnetv3_d_calib.pth', 13
+'densenet121','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/densenet121_calib.pth', 2
+'hrnet_w18_small','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/hrnet_w18_small_v1_calib.pth', 0
+'hrnetv2_w18','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/hrnetv2_w18_calib.pth', 0
+'mobilenetv2_050','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv2_050_calib.pth', 5
+'mobilenetv2_100','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv2_100_calib.pth', 0
+'mobilenetv2_110d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv2_110d_calib.pth', 0
+'mobilenetv2_120d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv2_120d_calib.pth', 0
+'mobilenetv2_140','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv2_140_calib.pth', 2
+'mobilenetv3_large_100_ra','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv3_large_100_ra_calib.pth', 6
+'mobilenetv3_large_100','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv3_large_100_calib.pth', 6
+'mobilenetv3_small_050','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv3_small_050_calib.pth', 5
+'mobilenetv3_small_075','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv3_small_075_calib.pth', 5
+'mobilenetv3_small_100','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mobilenetv3_small_100_calib.pth',5
+'regnetx_002','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnetx_002_calib.pth', 0
+'regnetx_032','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnetx_032_calib.pth', 0
+'regnetx_120','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnetx_120_calib.pth', 0
+'regnety_002','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnety_002_calib.pth', 0
+'regnety_032','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnety_032_calib.pth', 3
+'regnety_120','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnety_120_calib.pth', 8
+'regnetz_b16','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnetz_b_calib.pth', 11
+'regnetz_d32','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/regnetz_d_calib.pth', 12
+'spnasnet_100','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/spnasnet_100_calib.pth', 1
+'xception','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/xception_calib.pth', 0
+'adv_inception_v3','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/adv_inception_v3_calib.pth', 0
+'inception_v4','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/inceptionv4_calib.pth', 0
+'bat_resnext26ts','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/bat_resnext26ts_calib.pth', 8
+'botnet26t_c1','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/botnet26t_c1_calib.pth', 1
+'cspresnet50','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/cspresnet50_calib.pth', 5
+'cspresnext50','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/cspresnext50_calib.pth', 5
+'dm_nfnet_f0','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/dm_nfnet_f0_calib.pth', 0
+'dm_nfnet_f1','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/dm_nfnet_f1_calib.pth', 0
+'eca_botnext26ts_256','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/eca_botnext26ts_256_calib.pth', 3
+'eca_resnet33ts','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/eca_resnet33ts_calib.pth', 3
+'ecanfnet_l0','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/ecanfnet_l0_calib.pth', 0
+'ese_vovnet19b_dw','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/ese_vovnet19b_dw_calib.pth', 1
+'ese_vovnet39b','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/ese_vovnet39b_calib.pth', 0
+'gcresnet33ts','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/gcresnet33ts_calib.pth', 6
+'gcresnet50t','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/gcresnet50t_calib.pth', 0
+'gernet_l','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/gernet_l_calib.pth', 3
+'gernet_m','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/gernet_m_calib.pth', 4
+'gernet_s','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/gernet_s_calib.pth', 0
+'resnest14d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnest14d_calib.pth', 2
+'resnest26d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnest26d_calib.pth',3
+'haloregnetz_b','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/haloregnetz_b_calib.pth', 10
+'lambda_resnet26t','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/lambda_resnet26t_calib.pth', 0
+'lambda_resnet50ts','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/lambda_resnet50ts_calib.pth', 5
+'lcnet_050','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/lcnet_050_calib.pth', 3
+'lcnet_075','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/lcnet_075_calib', 3
+'lcnet_100','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/lcnet_100_calib.pth', 3
+'mixnet_l','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mixnet_l_calib.pth', 15
+'mixnet_m','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mixnet_m_calib.pth', 15
+'mixnet_s','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mixnet_s_calib.pth', 12
+'mnasnet_b1','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mnasnet_b1_calib.pth', 5
+'mnasnet_small','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/mnasnet_small_calib.pth', 6
+'semnasnet_075','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/semnasnet_075_calib.pth', 6
+'semnasnet_100','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/semnasnet_100_calib.pth', 3
+'repvgg_b0','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/repvgg_b0_calib.pth',0
+'repvgg_b1','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/repvgg_b1_calib.pth',0
+'repvgg_b2g4','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/repvgg_b2g4_calib.pth',0
+'repvgg_b3g4','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/repvgg_b3g4_calib.pth',0
+'dla34','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/dla34_calib.pth',0
+'dla60_res2net','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/dla60_res2net_calib.pth',0
+'legacy_seresnet18','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/legacy_seresnet18_calib.pth',1
+'legacy_seresnet50','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/legacy_seresnet50_calib.pth',0
+'sehalonet33ts':['https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/sehalonet33ts_calib.pth',5
+'seresnet33ts','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnet33ts_calib.pth',5
+'seresnet50','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnet50_calib.pth',0
+'seresnext26d_32x4d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnext26d_32x4d_calib.pth',1
+'seresnext26tn_32x4d','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnext26tn_32x4d_calib.pth',3
+'seresnext26ts','https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnext26ts_calib.pth',4

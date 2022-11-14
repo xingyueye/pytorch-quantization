@@ -40,7 +40,7 @@ parser.add_argument('--model', '-m', metavar='NAME', default='dpn92',
                     help='model architecture (default: dpn92)')
 parser.add_argument('-j', '--workers', default=6, type=int, metavar='N',
                     help='number of data loading workers (default: 2)')
-parser.add_argument('-b', '--batch-size', default=32, type=int,
+parser.add_argument('-b', '--batch-size', default=4, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
@@ -49,16 +49,30 @@ parser.add_argument('--num-classes', type=int, default=None,
 parser.add_argument('--output', type=str, default='./',
                     help='output directory of results')
 
-parser.add_argument('--num_bits', type=int, default=8)
-parser.add_argument('--method', type=str, default='entropy', choices=['max', 'entropy', 'percentile', 'mse'])
-parser.add_argument('--sensitivity_method', type=str, default='mse', choices=['mse', 'cosine', 'top1', 'snr'])
-parser.add_argument('--percentile', type=float, default=99.99)
-parser.add_argument('--drop', type=float, default=0.5)
-parser.add_argument('--per_layer_drop', type=float, default=0.2)
-parser.add_argument('--calib_num', type=int, default=4)
-parser.add_argument('--calib_weight', type=str, default=None)
-parser.add_argument('--save_qdq_onnx', action='store_true',
-                    help='use pre-trained model')
+parser.add_argument('--num_bits', type=int, default=8,
+                    help='quantization bit width')
+parser.add_argument('--method', type=str, default='entropy', choices=['max', 'entropy', 'percentile', 'mse'],
+                    help='calibration method')
+parser.add_argument('--sensitivity_method', type=str, default='mse', choices=['mse', 'cosine', 'top1', 'snr'],
+                    help='sensitivity method')
+parser.add_argument('--percentile', type=float, default=99.99,
+                    help='percentile need to be set when calibration method is percentile')
+parser.add_argument('--drop', type=float, default=0.5,
+                    help='allowed accuracy drop')
+parser.add_argument('--per_layer_drop', type=float, default=0.2,
+                    help='threshold of sensitive layers')
+parser.add_argument('--calib_num', type=int, default=32,
+                    help='calibration batch number')
+parser.add_argument('--calib_weight', type=str, default=None,
+                    help='calibration weight')
+parser.add_argument('--skip_layers_num', type=int, default=0,
+                    help='number of layers to be skipped')
+parser.add_argument('--skip_layers', nargs='+', default=[],
+                    help='layers to be skipped')
+parser.add_argument('--save_partial', action='store_true',
+                    help='save partial model pth')
+parser.add_argument('--save_onnx', action='store_true',
+                    help='export to onnx')
 
 class DataSaverHook:
     """
@@ -299,6 +313,15 @@ def partial_quant(sensitivity_list, model, loader, acc1, ptq_acc1, drop, per_lay
 
     return disable_layer_list, partial_acc1
 
+def partial_quant_skip_layers(model, loader, skip_layers_list):
+    disable_layer_list = list()
+    model_quant_enable(model)
+    for layer_name, sensitivity in skip_layers_list:
+        module_quant_disable(model, layer_name)
+        disable_layer_list.append(layer_name)
+    partial_acc1 = validate_model(loader, model)
+    return disable_layer_list, partial_acc1
+
 def top1_sensitivity(model, loader, device=None):
     if device is None:
         device = next(model.parameters()).device
@@ -329,6 +352,17 @@ def write_results(filename, arch, acc1, quant_acc1, skip_layers=None, partial_ac
         if skip_layers is not None:
             for layer in skip_layers:
                 cf.write(layer + '\n')
+
+def export_onnx(model, onnx_path, args, data_config):
+    quant_nn.TensorQuantizer.use_fb_fake_quant = True
+    data_shape = (args.batch_size,) + data_config['input_size']
+    imgs = torch.randn(data_shape).cuda()
+    torch.onnx.export(model, imgs, onnx_path,
+                        input_names=['input'],
+                        output_names=['output'],
+                        verbose=False,
+                        opset_version=13,
+                        operator_export_type=torch.onnx.OperatorExportTypes.ONNX)
 
 def main(args):
     quant_modules.initialize()
@@ -406,25 +440,25 @@ def main(args):
         pin_memory=False,
         tf_preprocessing=False)
 
+    if not os.path.exists(os.path.join(args.output, 'results')):
+        os.makedirs(os.path.join(args.output, 'results'))
+    if args.calib_weight is None:
+        if not os.path.exists(os.path.join(args.output, 'calib')):
+            os.makedirs(os.path.join(args.output, 'calib'))
+    if args.save_partial is True:
+        if not os.path.exists(os.path.join(args.output, 'partial')):
+            os.makedirs(os.path.join(args.output, 'partial'))
+    if args.save_onnx is True:
+        if not os.path.exists(os.path.join(args.output, 'onnx')):
+            os.makedirs(os.path.join(args.output, 'onnx'))
+
     if args.calib_weight is None:
         with torch.no_grad():
             collect_stats(model, train_loader, args.calib_num)
             compute_amax(model, method=args.method, percentile=args.percentile)
-        torch.save(model.state_dict(), args.model + '_calib.pth')
+        torch.save(model.state_dict(), os.path.join(os.path.join(args.output, 'calib'), args.model + '_calib.pth'))
     else:
         model.load_state_dict(torch.load(args.calib_weight))
-
-    if args.save_qdq_onnx:
-        quant_nn.TensorQuantizer.use_fb_fake_quant = True
-        onnx_model = "%s.onnx" % args.model
-        data_shape = (args.batch_size,) + data_config['input_size']
-        imgs = torch.randn(data_shape).cuda()
-        torch.onnx.export(model, imgs, onnx_model,
-                            input_names=['input'],
-                            output_names=['output'],
-                            verbose=False,
-                            opset_version=13,
-                            operator_export_type=torch.onnx.OperatorExportTypes.ONNX)
 
     model_quant_disable(model)
     ori_acc1 = validate_model(val_loader, model)
@@ -432,23 +466,41 @@ def main(args):
     model_quant_enable(model)
     quant_acc1 = validate_model(val_loader, model)
 
-    if not os.path.exists(args.output):
-        os.makedirs(args.output)
+
     if ori_acc1 - quant_acc1 > args.drop:
         if args.sensitivity_method == 'top1':
-            top1_list = top1_sensitivity(model, mini_loader)
-            top1_list.sort(key=lambda tup: tup[1], reverse=False)
-            print(top1_list)
-            skip_layers, partial_acc1 = partial_quant(top1_list, model, val_loader, ori_acc1, quant_acc1, args.drop, args.per_layer_drop)
-            write_results(os.path.join(args.output, args.model + "_top1_quant.txt"), args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
+            suffix = "top1_pptq"
+            sensitivity_list = top1_sensitivity(model, mini_loader)
         else:
-            mse_list = sensitivity_analyse(model, val_loader, args.sensitivity_method)
-            mse_list.sort(key=lambda tup: tup[1], reverse=True)
-            print(mse_list)
-            skip_layers, partial_acc1 = partial_quant(mse_list, model, val_loader, ori_acc1, quant_acc1, args.drop, args.per_layer_drop)
-            write_results(os.path.join(args.output, args.model + "_mse_quant.txt"), args.model, ori_acc1, quant_acc1, skip_layers, partial_acc1)
+            suffix = "{}_pptq".format(args.sensitivity_method)
+            sensitivity_list = sensitivity_analyse(model, val_loader, args.sensitivity_method)
+
+        sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
+        print(sensitivity_list)
+        if args.skip_layers_num > 0:
+            skip_layers_list = sensitivity_list[:args.skip_layers_num]
+            skip_layers, partial_acc1 = partial_quant_skip_layers(model, val_loader, skip_layers_list)
+        else:
+            skip_layers, partial_acc1 = partial_quant(sensitivity_list, model, val_loader, ori_acc1, quant_acc1, args.drop,
+                                                      args.per_layer_drop)
+        write_results(os.path.join(os.path.join(args.output, 'results'), args.model + "_{}.txt".format(suffix)),
+                      args.model,
+                      ori_acc1,
+                      quant_acc1,
+                      skip_layers,
+                      partial_acc1)
+        if args.save_partial:
+            torch.save(model.state_dict(), os.path.join(os.path.join(args.output, 'partial'), args.model + '_partial.pth'))
     else:
-        write_results(os.path.join(args.output, args.model + "_quant.txt"), args.model, ori_acc1, quant_acc1)
+        suffix = "ptq"
+        write_results(os.path.join(os.path.join(args.output, 'results'), args.model + "_{}.txt".format(suffix)),
+                      args.model,
+                      ori_acc1,
+                      quant_acc1)
+
+    if args.save_onnx:
+        onnx_path = os.path.join(os.path.join(args.output, 'onnx'), "{}_{}.onnx".format(args.model, suffix))
+        export_onnx(model, onnx_path, args, data_config)
 
 if __name__ == '__main__':
     args = parser.parse_args()
