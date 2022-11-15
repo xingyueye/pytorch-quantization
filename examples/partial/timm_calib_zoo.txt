@@ -90,7 +90,7 @@ dla34,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/dla34_calib.pth,0
 dla60_res2net,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/dla60_res2net_calib.pth,0
 legacy_seresnet18,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/legacy_seresnet18_calib.pth,1
 legacy_seresnet50,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/legacy_seresnet50_calib.pth,0
-sehalonet33ts:[https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/sehalonet33ts_calib.pth,5
+sehalonet33ts,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/sehalonet33ts_calib.pth,5
 seresnet33ts,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnet33ts_calib.pth,5
 seresnet50,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnet50_calib.pth,0
 seresnext26d_32x4d,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/seresnext26d_32x4d_calib.pth,1
