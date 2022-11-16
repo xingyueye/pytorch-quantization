@@ -340,7 +340,14 @@ def top1_sensitivity(model, loader, device=None):
     model_quant_enable(model)
     
     return top1_list
-            
+
+def save_preproc_config(model_name, data_config, path):
+    prep_dict = dict()
+    prep_dict[model_name] = data_config
+    prep_path = os.path.join(path, model_name + "_preproc.json")
+    json.dump(prep_dict, open(prep_path, 'w'))
+
+
 def write_results(filename, arch, acc1, quant_acc1, skip_layers=None, partial_acc1=None):
     with open(filename, mode='w') as cf:
         cf.write("mse" + '\n')
@@ -440,6 +447,8 @@ def main(args):
         pin_memory=False,
         tf_preprocessing=False)
 
+    if not os.path.exists(os.path.join(args.output, 'prep')):
+        os.makedirs(os.path.join(args.output, 'prep'))
     if not os.path.exists(os.path.join(args.output, 'results')):
         os.makedirs(os.path.join(args.output, 'results'))
     if args.calib_weight is None:
@@ -452,6 +461,7 @@ def main(args):
         if not os.path.exists(os.path.join(args.output, 'onnx')):
             os.makedirs(os.path.join(args.output, 'onnx'))
 
+    save_preproc_config(args.model, data_config, os.path.join(args.output, 'prep'))
     if args.calib_weight is None:
         with torch.no_grad():
             collect_stats(model, train_loader, args.calib_num)
