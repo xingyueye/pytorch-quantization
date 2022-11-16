@@ -481,11 +481,12 @@ def main(args):
         if args.sensitivity_method == 'top1':
             suffix = "top1_pptq"
             sensitivity_list = top1_sensitivity(model, mini_loader)
+            sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
         else:
             suffix = "{}_pptq".format(args.sensitivity_method)
             sensitivity_list = sensitivity_analyse(model, val_loader, args.sensitivity_method)
+            sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
 
-        sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
         print(sensitivity_list)
         if args.skip_layers_num > 0:
             skip_layers_list = sensitivity_list[:args.skip_layers_num]
