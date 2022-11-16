@@ -113,7 +113,7 @@ def partial_analyse(args):
                 float(lines[2].strip('\n')), float(lines[3].strip('\n'))
                 diff_acc = round(fp32_acc - ptq_acc, 4)
                 # quant_str = name + " " + str(fp32_acc) + " " + str(ptq_acc) + " " + str(diff_acc) + '\n'
-                quant_str = "{}\t\t{:.4f} {:.4f} {:.4f}\n".format(name, fp32_acc, ptq_acc, diff_acc)
+                quant_str = "{},{:.4f},{:.4f},{:.4f}\n".format(name, fp32_acc, ptq_acc, diff_acc)
                 cfid.write(quant_str)
         elif os.path.exists(partial_file):
             with open(partial_file, 'r') as pfid:
@@ -125,10 +125,10 @@ def partial_analyse(args):
                 diff_acc = round(fp32_acc - part_acc, 4)
                 # part_str = name + " " + str(fp32_acc) + " " + str(ptq_acc) + " " + \
                 #            str(part_acc) + " " + str(diff_acc) + " " + str(skip_num)
-                part_str = "{}\t\t{:.4f} {:.4f} {:.4f} {:.4f} {}\t".format(name, fp32_acc, ptq_acc, part_acc, diff_acc,
+                part_str = "{},{:.4f},{:.4f},{:.4f},{:.4f},{}".format(name, fp32_acc, ptq_acc, part_acc, diff_acc,
                                                                            skip_num)
                 for idx in range(5, lines_num):
-                    part_str = part_str + " " + lines[idx].strip('\n')
+                    part_str = part_str + "," + lines[idx].strip('\n')
                 part_str = part_str + "\n"
                 cfid.write(part_str)
     cfid.close()
