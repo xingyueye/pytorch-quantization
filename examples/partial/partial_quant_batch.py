@@ -97,7 +97,7 @@ def partial_quant(args):
 
 def partial_analyse(args):
     collection_file = 'partial_quant_collection_{}.txt'.format(args.sensitivity_method)
-    cfid = open(collection_file, 'w')
+    cfid = open(os.path.join(args.output_path, collection_file), 'w')
 
     timm_zoo_file = open(args.timm_zoo, 'r')
     timm_zoo_lines = timm_zoo_file.readlines()
