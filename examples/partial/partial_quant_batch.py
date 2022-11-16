@@ -17,8 +17,6 @@ parser.add_argument('--batch-size', default=4, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--output_path', default='./', type=str,
                     help='path to save results')
-parser.add_argument('--log_path', default='./', type=str,
-                    help='path to save logs')
 
 parser.add_argument('--num_bits', type=int, default=8,
                     help='quantization bit width')
@@ -54,9 +52,10 @@ def partial_quant(args):
         print("Create dir {}".format(pretrained_path))
         os.makedirs(pretrained_path)
 
-    if not os.path.exists(args.log_path):
-        print("Create dir {}".format(args.log_path))
-        os.makedirs(args.log_path)
+    log_path = os.path.join(args.output_path, 'log')
+    if not os.path.exists(log_path):
+        print("Create dir {}".format(log_path))
+        os.makedirs(log_path)
 
     timm_zoo_file = open(args.timm_zoo, 'r')
     timm_zoo_lines = timm_zoo_file.readlines()
@@ -72,7 +71,7 @@ def partial_quant(args):
 
         print("Step2 Do partial quantization...")
         PARTIAL_QUANT_FILENAME = 'partial_quant_demo.py'
-        log_file = os.path.join(args.log_path, "{}_partial_quantization.txt".format(model_name))
+        log_file = os.path.join(log_path, "{}_partial_quantization.txt".format(model_name))
         command_list = [sys.executable, PARTIAL_QUANT_FILENAME,
                         '--data', args.data,
                         '--split', args.split,
@@ -104,8 +103,9 @@ def partial_analyse(args):
     timm_zoo_lines = timm_zoo_file.readlines()
     for idx, line in enumerate(timm_zoo_lines):
         model_name, _, _ = line.strip('\n').split(',')
-        quant_file = os.path.join(args.output_path, model_name + '_ptq.txt')
-        partial_file = os.path.join(args.output_path, model_name + '_' + args.sensitivity_method + '_pptq.txt')
+        result_path = os.path.join(args.output_path, 'results')
+        quant_file = os.path.join(result_path, model_name + '_ptq.txt')
+        partial_file = os.path.join(result_path, model_name + '_' + args.sensitivity_method + '_pptq.txt')
         if os.path.exists(quant_file):
             with open(quant_file, 'r') as qfid:
                 lines = qfid.readlines()
