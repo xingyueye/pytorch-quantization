@@ -157,6 +157,7 @@ class EngineBuilder:
             if not self.builder.platform_has_fast_int8:
                 log.warning("INT8 is not supported natively on this platform/device")
             else:
+                self.config.set_flag(trt.BuilderFlag.FP16)
                 self.config.set_flag(trt.BuilderFlag.INT8)
                 if not quantized:
                     from .calib import EngineCalibrator
