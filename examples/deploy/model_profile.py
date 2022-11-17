@@ -62,6 +62,8 @@ if __name__ == '__main__':
                         help="enable sparsity")
     parser.add_argument('--io_format', default='kLINEAR', type=str, choices=['kLINEAR'])
     parser.add_argument('--io_datatype', default='fp32', type=str, choices=['fp16', 'fp32'])
+    parser.add_argument('--graph_dump', default=False, action='store_true',
+                        help='dump engine graph to json file')
     args = parser.parse_args()
     print(args)
 
@@ -118,6 +120,7 @@ if __name__ == '__main__':
             kwargs['io_datatype'] = args.io_datatype
             trt_fp16_engine = os.path.join(trt_fp16_epath, model_name + '_fp16.trt')
             kwargs['engine'] = trt_fp16_engine
+            kwargs['graph_dump'] = args.graph_dump
             trt_engine_build(onnx_rmqdq_file, input_shapes, args.verbose, **kwargs)
 
             evaluator = Evaluator(trt_fp16_engine, val_loader, dtype=args.io_datatype)
@@ -146,6 +149,7 @@ if __name__ == '__main__':
             kwargs['io_datatype'] = args.io_datatype
             trt_int8_engine = os.path.join(trt_int8_epath, model_name + '_int8.trt')
             kwargs['engine'] = trt_int8_engine
+            kwargs['graph_dump'] = args.graph_dump
             trt_engine_build(onnx_rmqdq_file, input_shapes, args.verbose, **kwargs)
 
             evaluator = Evaluator(trt_int8_engine, val_loader, dtype=args.io_datatype)
@@ -173,6 +177,7 @@ if __name__ == '__main__':
             kwargs['io_datatype'] = args.io_datatype
             trt_int8_rmqdq_engine = os.path.join(trt_int8_rmqdq_epath, model_name + suffix + '_rmqdq_int8.trt')
             kwargs['engine'] = trt_int8_rmqdq_engine
+            kwargs['graph_dump'] = args.graph_dump
             trt_engine_build(onnx_rmqdq_file, input_shapes, args.verbose, **kwargs)
 
             evaluator = Evaluator(trt_int8_rmqdq_engine, val_loader, dtype=args.io_datatype)

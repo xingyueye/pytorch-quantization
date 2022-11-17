@@ -49,6 +49,7 @@ class EngineBuilder:
         self.tactic = kwargs.pop('tactic', 7)
         self.io_format = kwargs.pop('io_format', 'kLINEAR')
         self.io_datatype = kwargs.pop('io_datatype', 'fp16')
+        self.graph_dump = kwargs.pop('graph_dump', False)
 
     def create_network(self):
         """
@@ -123,6 +124,7 @@ class EngineBuilder:
         input_shapes = self.input_shapes
         quantized = self.quantized
         tactic = self.tactic
+        graph_dump = self.graph_dump
 
         engine_path = os.path.realpath(engine_path)
         engine_dir = os.path.dirname(engine_path)
@@ -184,11 +186,21 @@ class EngineBuilder:
         if sparsity:
             log.warning("Setting sparsity flag on builder_config.")
             self.config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
-
+        if graph_dump:
+            log.warning("Setting profile verbose flag on builder_config.")
+            self.config.profiling_verbosity = trt.ProfilingVerbosity.DETAILED
+            engine_path = engine_path.replace('.trt', '_profiled.trt')
         self.set_io_format()
         with self.builder.build_engine(self.network, self.config) as engine, open(engine_path, "wb") as f:
             log.info("Serializing engine to file: {:}".format(engine_path))
             f.write(engine.serialize())
+
+        if graph_dump:
+            inspector = engine.create_engine_inspector()
+            graph_json = inspector.get_engine_information(trt.LayerInformationFormat.JSON)
+            engine_graph_path = engine_path.replace('.trt', '.json')
+            with open(engine_graph_path, 'w') as gf:
+                gf.write(graph_json)
 
         return engine_path
 
@@ -242,6 +254,8 @@ if __name__ == "__main__":
     # ]
     parser.add_argument("-t", "--tactic", type=int, default=7,
                         help="Set tactic policy, default: enable all tactic policies")
+    parser.add_argument('--graph_dump', default=False, action='store_true',
+                        help='dump engine graph to json file')
     args = parser.parse_args()
     print(args)
 
