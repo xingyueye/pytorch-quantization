@@ -23,6 +23,15 @@ def get_prev_node(nodes, node):
                 prev_node_list.append(node)
     return prev_node_list
 
+def get_next_node(nodes, node):
+    node_output_list = node.output
+    next_node_list = []
+    for node_id, node in enumerate(nodes):
+        for node_input in node.input:
+            if node_input in node_output_list:
+                next_node_list.append(node)
+    return next_node_list
+
 def get_conv_qdq_node(nodes, conv_node):
     # get conv input
     conv_input_id = conv_node.input[0]
@@ -113,6 +122,59 @@ def onnx_conv_horizon_fuse(onnx_model):
             print(val)
 
     return onnx_replica
+
+def onnx_add_insert_qdqnode(onnx_model):
+    onnx_replica = copy.deepcopy(onnx_model)
+    graph = onnx_replica.graph
+    nodes = graph.node
+    # find qualified add op
+    patterns = []
+    for node_id, node in enumerate(graph.node):
+        if node.op_type == "Add":
+            same_input_node_list = []
+            same_input = None
+            for add_input in node.input:
+                for other_id, other_node in enumerate(nodes):
+                    if other_id != node_id:
+                        for other_input in other_node.input:
+                            if other_input == add_input:
+                                same_input_node_list.append(other_node)
+                                same_input = other_input
+                                break
+            # Find previous node of Add, which has two output, one is QuantizeLinear, other is Add
+            if len(same_input_node_list) == 1 and same_input_node_list[0].op_type == 'QuantizeLinear':
+                prev_add_node = search_node_by_output_id(nodes, same_input)
+                dequant_node = get_next_node(nodes, same_input_node_list[0])[0]
+                patterns.append((node, prev_add_node, same_input_node_list[0], dequant_node, same_input))
+    print(patterns)
+    for pattern in patterns:
+        add_node, prev_add_node, quant_node, dequant_node, same_input = pattern
+        dq_x, dq_s, dq_z = dequant_node.input
+        new_quant_node = onnx.helper.make_node('QuantizeLinear',
+                                                inputs=quant_node.input,
+                                                outputs=[prev_add_node.name + "_Dequant"],
+                                                name=prev_add_node.name + "_QuantizeLinear")
+        new_dequant_node = onnx.helper.make_node('DequantizeLinear',
+                                                inputs=[prev_add_node.name + "_Dequant", dq_s, dq_z],
+                                                outputs=[prev_add_node.name + "_Add"],
+                                                name=prev_add_node.name + "_DequantizeLinear")
+
+        add_node.input.remove(same_input)
+        add_node.input.append(prev_add_node.name + "_Add")
+        for node_id, node in enumerate(graph.node):
+            if node.name == prev_add_node.name:
+                graph.node.insert(node_id + 1, new_quant_node)
+                graph.node.insert(node_id + 2, new_dequant_node)
+
+    return onnx_replica
+
+        # new_dequant_node = onnx.helper.make_node('DequantizeLinear',
+        #                                         inputs=quant_node.input,
+        #                                         outputs=prev_add_node.output,
+        #                                         name=prev_add_node.name + "_DequantizeLinear")
+
+
+
 
 
 def onnx_remove_qdqnode(onnx_model):
@@ -216,10 +278,24 @@ if __name__ == '__main__':
 
     onnx_file = sys.argv[1]
     model = onnx.load(onnx_file)
-    model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
+    # model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
+    #
+    # onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
+    # onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
+    # onnx.save(model, os.path.join(onnx_dir, onnx_new_name))
+    # cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
+    # save_calib_cache_file(cache_name, activation_map)
 
+
+    # onnx_fuse = onnx_conv_horizon_fuse(model)
+    # onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
+    # onnx_new_name = onnx_name.replace('.onnx', '_fuse_horizon.onnx')
+    # onnx.save(onnx_fuse, os.path.join(onnx_dir, onnx_new_name))
+
+    onnx_insert = onnx_add_insert_qdqnode(model)
+    model_wo_qdq, activation_map = onnx_remove_qdqnode(onnx_insert)
     onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
     onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
-    onnx.save(model, os.path.join(onnx_dir, onnx_new_name))
-    cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
+    onnx.save(onnx_insert, os.path.join(onnx_dir, onnx_new_name))
+    cache_name = onnx_new_name.replace('.onnx', '_add_insert_qdq_calibration.cache')
     save_calib_cache_file(cache_name, activation_map)
