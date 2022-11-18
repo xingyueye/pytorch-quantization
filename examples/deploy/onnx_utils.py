@@ -215,7 +215,13 @@ def onnx_remove_qdqnode(onnx_model):
                         # print(node.attribute[0].t.raw_data)
                         # print(np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32))
                         val = np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32)[0]
-                        activation_map[in_name] = struct.pack('>f', val).hex()
+                        if in_name in activation_map.keys():
+                            old_val = struct.unpack('!f', bytes.fromhex(activation_map[in_name]))[0]
+                            # print("Already record, old {:.4f}, new {:.4f}".format(old_val, val))
+                            if val > old_val:
+                                activation_map[in_name] = struct.pack('>f', val).hex()
+                        else:
+                            activation_map[in_name] = struct.pack('>f', val).hex()
             # remove QuantizeLinear node
             graph.node.remove(nodes[node_id])
 
