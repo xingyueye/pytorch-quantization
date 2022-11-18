@@ -21,6 +21,7 @@ class Evaluator(object):
         self.trt_infer = TensorRTInfer(self.engine_path)
         self.dtype = dtype
         self.criterion = nn.CrossEntropyLoss()
+        self.batch_size = val_loader.batch_size
 
     def evaluate(self):
         # for trt build, model already on GPU
@@ -54,7 +55,7 @@ class Evaluator(object):
                 progress_bar(batch_idx, len(self.val_loader), 'Loss: {:.3f} | Acc1: {:.3f}% | Acc5: {:.3f}%'
                             .format(losses.avg, top1.avg, top5.avg))
 
-        return top1.avg, top5.avg, latency.avg, 1000.0/latency.avg
+        return top1.avg, top5.avg, latency.avg, 1000.0/latency.avg * self.batch_size
 
 
 if __name__ == "__main__":

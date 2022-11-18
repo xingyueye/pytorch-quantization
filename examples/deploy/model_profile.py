@@ -15,6 +15,7 @@ def prepare_env(model_zoo_path):
     cache_rmqdq_path = os.path.join(model_zoo_path, 'cache_rmqdq')
     prep_path = os.path.join(model_zoo_path, 'prep')
     model_file = os.path.join(model_zoo_path, 'partial_quant_collection_mse.txt')
+    profile_file = os.path.join(model_zoo_path, 'partial_quant_profile.txt')
 
     if not os.path.exists(onnx_rmqdq_path):
         print("Create {}".format(onnx_rmqdq_path))
@@ -36,7 +37,7 @@ def prepare_env(model_zoo_path):
         os.makedirs(trt_int8_rmqdq_engine_path)
 
     return model_file, onnx_path, onnx_rmqdq_path, cache_rmqdq_path, \
-           prep_path, trt_fp16_engine_path, trt_int8_engine_path, trt_int8_rmqdq_engine_path
+           prep_path, trt_fp16_engine_path, trt_int8_engine_path, trt_int8_rmqdq_engine_path, profile_file
 
 
 
@@ -70,7 +71,9 @@ if __name__ == '__main__':
     assert os.path.exists(args.model_zoo_path), "model_zoo_path {} does not exist"
 
     model_file, onnx_path, onnx_rmqdq_path, cache_rmqdq_path, prep_path, \
-    trt_fp16_epath, trt_int8_epath, trt_int8_rmqdq_epath = prepare_env(args.model_zoo_path)
+    trt_fp16_epath, trt_int8_epath, trt_int8_rmqdq_epath, profile_file = prepare_env(args.model_zoo_path)
+
+    fprof = open(profile_file, 'w')
 
     with open(model_file, 'r') as mfile:
         lines = mfile.readlines()
@@ -79,8 +82,10 @@ if __name__ == '__main__':
             model_name = quant_info[0]
             if len(quant_info) == 4:
                 suffix = '_ptq'
+                fp32_top1, ptq_int8_top1, pptq_int8_top1 = float(quant_info[1]), float(quant_info[2]), 0.0
             else:
                 suffix = '_mse_pptq'
+                fp32_top1, ptq_int8_top1, pptq_int8_top1 = float(quant_info[1]), float(quant_info[2]), float(quant_info[3])
             onnx_file = os.path.join(onnx_path, model_name + suffix + '.onnx')
             model_prep = os.path.join(prep_path, model_name + '_preproc.json')
             prep_config = json.load(open(model_prep))[model_name]
@@ -189,3 +194,21 @@ if __name__ == '__main__':
                                                                                                     int8_rmqdq_latency,
                                                                                                     int8_rmqdq_qps))
 
+            prof_str = "{},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".\
+                                                                                                    format(
+                                                                                                    model_name,
+                                                                                                    fp32_top1,
+                                                                                                    ptq_int8_top1,
+                                                                                                    pptq_int8_top1,
+                                                                                                    fp16_top1,
+                                                                                                    fp16_latency,
+                                                                                                    fp16_qps,
+                                                                                                    int8_top1,
+                                                                                                    int8_latency,
+                                                                                                    int8_qps,
+                                                                                                    int8_rmqdq_top1,
+                                                                                                    int8_rmqdq_latency,
+                                                                                                    int8_rmqdq_qps
+                                                                                                    )
+            fprof.write(prof_str)
+    fprof.close()
