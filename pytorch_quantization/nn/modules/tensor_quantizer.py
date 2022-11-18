@@ -22,7 +22,7 @@ from absl import logging
 import torch
 from torch import nn
 
-from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant, lsq_fake_tensor_quant
+from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant, lsq_fake_tensor_quant, lsq_plus_fake_tensor_quant
 from pytorch_quantization.nn.modules.clip import Clip
 from pytorch_quantization.nn.modules.grad_scale import GradScale
 
@@ -103,6 +103,9 @@ class TensorQuantizer(nn.Module):
             self._learn_scale_init = False
             self._learn_scale_type = quant_desc._learn_scale_type
             self.grad_scale = GradScale(self._num_bits, self._unsigned, use_sqrt=True if self._learn_scale_type == 'stable_lsq' else False)
+        
+            if quant_desc._learn_scale_type == 'lsq_plus':
+                self.register_buffer('_amin', torch.tensor(0.0))
 
         if quant_desc.calib_method == "histogram":
             logging.info("Creating histogram calibrator")
@@ -111,6 +114,9 @@ class TensorQuantizer(nn.Module):
         elif quant_desc.calib_method == "max":
             logging.info("Creating Max calibrator")
             self._calibrator = calib.MaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
+        elif quant_desc.calib_method == "minmax":
+            logging.info("Creating MinMax calibrator")
+            self._calibrator = calib.MinMaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
 
     # pylint:disable=missing-docstring
     @property
@@ -234,6 +240,8 @@ class TensorQuantizer(nn.Module):
             raise RuntimeError("Calibrator not created.")
         if self._learn_scale and self._learn_scale_type == 'lsq':
             calib_amax = self._calibrator.compute_amax_lsq()
+        elif self._learn_scale and self._learn_scale_type == 'lsq_plus':
+            calib_amax, calib_amin = self._calibrator.compute_amax()
         else:
             calib_amax = self._calibrator.compute_amax(*args, **kwargs)
         if calib_amax is None:
@@ -251,6 +259,12 @@ class TensorQuantizer(nn.Module):
             self.register_buffer('_amax', calib_amax.data)
         else:
             self._amax.copy_(calib_amax)
+
+        if self._learn_scale and self._learn_scale_type == 'lsq_plus':
+            if not hasattr(self, '_amin'):
+                self.register_buffer('_amin', calib_amin.data)
+            else:
+                self._amin.copy_(calib_amin)
 
     def init_learn_amax(self):
         """Initialize learned amax from fixed amax"""
@@ -285,16 +299,29 @@ class TensorQuantizer(nn.Module):
             del self._scale
         self.register_parameter('_scale', value)
 
+    def _lsq_plus_init(self):
+        range = self._amax - self._amin
+        qmax = 2.0**(self._num_bits) - 1.0
+        scale = torch.nn.Parameter(range / qmax, requires_grad=True)
+        if hasattr(self, '_scale'):
+            del self._scale
+        self.register_parameter('_scale', scale)
+
+        offset = torch.nn.Parameter(self._amin, requires_grad=True)
+        if hasattr(self, '_offset'):
+            del self._offset
+        self.register_parameter('_offset', offset)
+
     def init_learn_scale(self, inputs=None):
         """Initialize learned scale from PTQ amax or lsq_init"""
         if self._learn_scale_type == 'lsq':
             self._lsq_init(inputs)
-            # if inputs is None:
-            #     logging.info("Scale of activation quantizer would be actually initialized during the first batch!")   
-            # else:
             self._learn_scale_init = True  
         elif self._learn_scale_type == 'stable_lsq':
             self._ptq_init()
+            self._learn_scale_init = True
+        elif self._learn_scale_type == 'lsq_plus':
+            self._lsq_plus_init()
             self._learn_scale_init = True
         else:
             raise TypeError("Learned-step quantization doesn't support init_type of {}".format(self._learn_scale_type))
@@ -356,8 +383,10 @@ class TensorQuantizer(nn.Module):
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
-                if self._learn_scale:
+                if self._learn_scale and self._learn_scale_type == 'lsq':
                     outputs = lsq_fake_tensor_quant(inputs, scale, self._num_bits, self._unsigned, self._narrow_range)
+                elif self._learn_scale and self._learn_scale_type == 'lsq_plus':
+                    outputs = lsq_plus_fake_tensor_quant(inputs, scale, self._offset, self._num_bits, self._unsigned, self._narrow_range)
                 else:
                     outputs = fake_tensor_quant(inputs, amax, self._num_bits, self._unsigned, self._narrow_range)
             else:
@@ -389,6 +418,8 @@ class TensorQuantizer(nn.Module):
             # Shape is only know when it sees the first tensor
             if self._learn_scale and self._learn_scale_type == 'lsq':
                 self._calibrator.lsq_collect(inputs)
+            # if self._learn_scale and self._learn_scale_type == 'lsq_plus':
+            #     self._calibrator.collect(inputs)
             else:
                 self._calibrator.collect(inputs)
 

@@ -81,6 +81,34 @@ class _Calibrator():
                 raise RuntimeError("amax shape changed!")
             self._calib_amax.copy_(((self._calib_amax * (self._calib_iter-1) + local_amax)/self._calib_iter).data)
 
+    def lsq_plus_collect(self, x):
+        """Tracks the minimum / maximun values with float mode, to initialize LSQ_PLUS
+        Args:
+            x: A tensor
+        Raises:
+            RuntimeError: If amax shape changes
+        """
+        if not hasattr(self, '_calib_amax'):
+            self._calib_amax = None
+        if not hasattr(self, '_calib_amin'):
+            self._calib_amin = None
+        if not hasattr(self, '_calib_iter'):
+            self._calib_iter = 0
+        self._calib_iter += 1
+
+        local_min = x.min()
+        local_max = x.max()
+        if self._calib_amax is None:
+            self._calib_amax = local_max
+        else:
+            self._calib_amax.copy_(torch.max(self._calib_amax, local_max).data)
+        
+        if self._calib_amin is None:
+            self._calib_amin = local_min
+        else:
+            self._calib_amin.copy_(torch.min(self._calib_amin, local_min).data)
+
+
     def reset(self):
         """Abstract method: reset calibrator to initial state"""
         raise NotImplementedError

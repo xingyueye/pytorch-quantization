@@ -402,6 +402,139 @@ class FakeTensorQuantFunction(Function):
         grad_inputs = torch.where(inputs.abs() <= amax, grad_outputs, zero)
         return grad_inputs, None, None, None, None
 
+class LSQPLUSFakeTensorQuantFunction(Function):
+    """A tensor quantization function with learnable scales
+
+    Take an input tensor and its quantization scale, output an quantized tensor. The granularity of scale is the same with the
+    shape of amax.
+    output_dtype indicates whether the quantized value will be stored in integer or float. The reason we want to store
+    it in float is the pytorch function takes the quantized value may not accept integer input, e.g. Conv2D.
+
+    It uses 2^num_bits -1 values instead of 2^num_bits. e.g., for num_bits=8, it uses [-127, 127] instead of [-128, 127]
+    """
+
+    @staticmethod
+    def forward(ctx, inputs, scale, offset, num_bits=8, unsigned=False, narrow_range=True):
+        """
+
+        Follow tensorflow convention, max value is passed in and used to decide scale, instead of inputing scale
+        directly. Though inputing scale directly may be more natural to use.
+
+        Args:
+            ctx: A Context object to store tensors for backward.
+            inputs: A Tensor of type float32.
+            scale: A Tensor of type float32. Inputs will be quantized by scale
+                scale will be broadcasted to inputs tensor.
+            offset: A Tensor of type float32. Inputs will be reduced bt scale
+            num_bits: A integer used to calculate scaling factor, scale = (2^(num_bits-1) - 1) / max
+                Effectively, it indicates how many integer bits is used to represent the value. Default 8.
+            output_dtype: A type of Tensor. torch.int32 or torch.float32.
+            unsigned: A boolean. Use unsigned integer range. E.g. [0, 255] for num_bits=8. Default False.
+            narrow_range: A boolean. Use symmetric integer range for signed quantization
+                E.g. [-127,127] instead of [-128,127] for num_bits=8. Default True.
+
+        Returns:
+            outputs: A Tensor of type output_dtype.
+
+        Raises:
+            ValueError:
+        """
+        # assert unsigned, 'Function "_tensor_quant_scale_offset" only support signed asymmetric quantization'
+        # max_bound = torch.tensor((2.0**(num_bits - 1)), device=scale.device)
+        # min_bound = torch.tensor(0.0, device=scale.device)
+        max_bound = torch.tensor((2.0**(num_bits - 1)) - 1.0, device=scale.device)
+        min_bound = -max_bound - 1
+
+        ctx.save_for_backward(inputs, scale, offset, max_bound, min_bound)
+        outputs = _tensor_quant_scale_offset(inputs, scale, min_bound, max_bound)
+        return outputs
+
+    @staticmethod
+    def backward(ctx, grad_outputs):
+        """
+        Implements straight through estimation as LSQ. For -amax <= input <= amax
+        the gradient passes straight through, otherwise the gradient is zero.
+
+        Args:
+            ctx: A Context object with saved tensors from forward.
+            grad_outputs: A tensor of gradient of outputs.
+
+        Returns:
+            grad_inputs: A tensor of gradient.
+            grad_scale: A tensor of gradient of scale.
+        """
+        inputs, scale, offset, max_bound, min_bound = ctx.saved_tensors
+        if grad_outputs.dtype == torch.half:
+            max_bound = max_bound.half()
+            min_bound = min_bound.half()
+
+        fake_quant_point = (inputs - offset) / scale
+
+        zero = grad_outputs.new_zeros(1) # create a zero tensor with the same type and device
+        grad_inputs = torch.where((fake_quant_point <= max_bound)*(fake_quant_point >= min_bound), grad_outputs, zero)
+
+        grad_scale = -fake_quant_point + fake_quant_point.round()
+        grad_scale = torch.where(grad_scale >= min_bound, grad_scale, min_bound)
+        grad_scale = torch.where(grad_scale <= max_bound, grad_scale, max_bound)
+
+        ones = grad_outputs.new_ones(1)
+        grade_offset = torch.where((fake_quant_point < max_bound)*(fake_quant_point > min_bound), zero, ones)
+
+        grad_scale = grad_scale * grad_outputs
+        grade_offset = grade_offset * grad_outputs
+
+        if len(scale.size()) > 0:
+            dim = []
+            for i in range(len(scale.size())):
+                if scale.size()[i] == 1:
+                    dim.append(i)
+            grad_scale = grad_scale.sum(dim=dim, keepdim=True)
+            grade_offset = grade_offset.sum(dim=dim, keepdim=True)
+        else:
+            grad_scale = grad_scale.sum()            
+            grade_offset = grade_offset.sum()
+        
+        return grad_inputs, grad_scale, grade_offset, None, None, None
+
+
+def _tensor_quant_scale_offset(inputs, scale, offset, min_bound=0, max_bound=255):
+    """
+        Forward Function for Signed Asymmetric Quantization.
+        Quantization Scheme: x_q = round(clamp((x - shift)/scale, min_bound, max_bound)
+    """
+    # Fine scale, per channel scale will be handled by broadcasting, which could be tricky. Pop a warning.
+    # if isinstance(scale, torch.Tensor) and inputs.dim() != scale.dim():
+    #     logging.debug("scale %s has different shape than inputs %s. Make sure broadcast works as expected!",
+    #                   scale.size(), inputs.size())
+
+    # logging.debug("{} bits quantization on shape {} tensor.".format(num_bits, inputs.size()))
+
+
+
+    # Computation must be in FP32 to prevent potential over flow.
+    input_dtype = inputs.dtype
+    if inputs.dtype == torch.half:
+        inputs = inputs.float()
+    if scale.dtype == torch.half:
+        scale = scale.float()
+    
+    inputs -= offset
+
+    min_scale = scale.min()
+    if min_scale < 0:
+        raise ValueError("Negative values in scale")
+
+    epsilon = 1. / (1<<24)
+    # in case of dividing zero
+    scale = scale + epsilon
+    outputs = torch.clamp((inputs / scale).round_(), min_bound, max_bound)
+    # restore scale value
+    scale = scale - epsilon
+
+    if input_dtype == torch.half:
+        outputs = outputs.half()
+
+    return outputs * scale.to(inputs.dtype)
 
 def _tensor_quant_scale(inputs, scale, num_bits=8, unsigned=False, narrow_range=True):
     """Shared function body between TensorQuantFunction and FakeTensorQuantFunction"""
@@ -558,4 +691,5 @@ class FakeAffineTensorQuantFunction(Function):
 tensor_quant = TensorQuantFunction.apply
 fake_tensor_quant = FakeTensorQuantFunction.apply
 lsq_fake_tensor_quant = LSQFakeTensorQuantFunction.apply
+lsq_plus_fake_tensor_quant = LSQPLUSFakeTensorQuantFunction.apply
 fake_affine_tensor_quant = FakeAffineTensorQuantFunction.apply
