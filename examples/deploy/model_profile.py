@@ -128,6 +128,8 @@ if __name__ == '__main__':
             kwargs['graph_dump'] = args.graph_dump
             trt_engine_build(onnx_rmqdq_file, input_shapes, args.verbose, **kwargs)
 
+            if args.graph_dump:
+                trt_fp16_engine = trt_fp16_engine.replace('.trt', '_profiled.trt')
             evaluator = Evaluator(trt_fp16_engine, val_loader, dtype=args.io_datatype)
             fp16_top1, fp16_top5, fp16_latency, fp16_qps = evaluator.evaluate()
             print("FP16 TOP1 = {:.2f}, FP16 TOP5 = {:.2f}, FP16 LAT={:.2f}, FP16 QPS={:.2f}".format(fp16_top1,
@@ -157,6 +159,8 @@ if __name__ == '__main__':
             kwargs['graph_dump'] = args.graph_dump
             trt_engine_build(onnx_rmqdq_file, input_shapes, args.verbose, **kwargs)
 
+            if args.graph_dump:
+                trt_int8_engine = trt_int8_engine.replace('.trt', '_profiled.trt')
             evaluator = Evaluator(trt_int8_engine, val_loader, dtype=args.io_datatype)
             int8_top1, int8_top5, int8_latency, int8_qps = evaluator.evaluate()
             print("INT8 TOP1 = {:.2f}, INT8 TOP5 = {:.2f}, INT8 LAT={:.2f}, INT8 QPS={:.2f}".format(int8_top1,
@@ -185,6 +189,8 @@ if __name__ == '__main__':
             kwargs['graph_dump'] = args.graph_dump
             trt_engine_build(onnx_rmqdq_file, input_shapes, args.verbose, **kwargs)
 
+            if args.graph_dump:
+                trt_int8_rmqdq_engine = trt_int8_rmqdq_engine.replace('.trt', '_profiled.trt')
             evaluator = Evaluator(trt_int8_rmqdq_engine, val_loader, dtype=args.io_datatype)
             int8_rmqdq_top1, int8_rmqdq_top5, int8_rmqdq_latency, int8_rmqdq_qps = evaluator.evaluate()
             print("INT8 RMQDQ TOP1 = {:.2f}, INT8 RMQDQ TOP5 = {:.2f}, INT8 RMQDQ LAT={:.2f}, INT8 RMQDQ QPS={:.2f}".\
