@@ -61,6 +61,8 @@ class AsymHistogramCalibrator(_Calibrator):
 
         self._torch_hist = torch_hist
 
+        self._calib_amin = None
+
         if axis is not None:
             raise NotImplementedError("Calibrator histogram collection only supports per tensor scaling")
 
@@ -69,6 +71,13 @@ class AsymHistogramCalibrator(_Calibrator):
 
     def collect(self, x):
         """Collect histogram"""
+
+        local_amin = torch.min(x).detach()
+        if self._calib_amin is None:
+            self._calib_amin = local_amin
+        else:
+            self._calib_amin.copy_(torch.min(self._calib_amin, local_amin).data)
+            
         if torch.min(x) < 0.:
             logging.log_first_n(
                 logging.INFO,
@@ -100,27 +109,27 @@ class AsymHistogramCalibrator(_Calibrator):
                 hist[:len(self._calib_hist)] += self._calib_hist
                 self._calib_hist = hist
         else:
-            NotImplementedError
-            # # This branch of code is designed to match numpy version as close as possible
-            # with torch.no_grad():
-            #     if self._skip_zeros:
-            #         x = x[torch.where(x != 0)]
+            # This branch of code is designed to match numpy version as close as possible
+            with torch.no_grad():
+                if self._skip_zeros:
+                    x = x[torch.where(x != 0)]
 
-            #     # Because we collect histogram on absolute value, setting min=0 simplifying the rare case where
-            #     # minimum value is not exactly 0 and first batch collected has larger min value than later batches
-            #     x_max = x.max()
-            #     if self._calib_bin_edges is None and self._calib_hist is None:
-            #         self._calib_hist = torch.histc(x, bins=self._num_bins, min=0, max=x_max)
-            #         self._calib_bin_edges = torch.linspace(0, x_max, self._num_bins + 1)
-            #     else:
-            #         if x_max > self._calib_bin_edges[-1]:
-            #             width = self._calib_bin_edges[1] - self._calib_bin_edges[0]
-            #             self._num_bins = int((x_max / width).ceil().item())
-            #             self._calib_bin_edges = torch.arange(0, x_max + width, width, device=x.device)
+                # Because we collect histogram on absolute value, setting min=0 simplifying the rare case where
+                # minimum value is not exactly 0 and first batch collected has larger min value than later batches
+                x_max = x.max()
+                if self._calib_bin_edges is None and self._calib_hist is None:
+                    self._calib_hist = torch.histc(x, bins=self._num_bins, min=0, max=x_max)
+                    self._calib_bin_edges = torch.linspace(0, x_max, self._num_bins + 1)
+                else:
+                    if x_max > self._calib_bin_edges[-1]:
+                        width = self._calib_bin_edges[1] - self._calib_bin_edges[0]
+                        self._num_bins = int((x_max / width).ceil().item())
+                        self._calib_bin_edges = torch.arange(0, x_max + width, width, device=x.device)
 
-            #         hist = torch.histc(x, bins=self._num_bins, min=0, max=self._calib_bin_edges[-1])
-            #         hist[:self._calib_hist.numel()] += self._calib_hist
-            #         self._calib_hist = hist
+                    hist = torch.histc(x, bins=self._num_bins, min=0, max=self._calib_bin_edges[-1])
+                    hist[:self._calib_hist.numel()] += self._calib_hist
+                    self._calib_hist = hist
+
 
     def reset(self):
         """Reset the collected histogram"""
@@ -160,7 +169,7 @@ class AsymHistogramCalibrator(_Calibrator):
         else:
             raise TypeError("Unknown calibration method {}".format(method))
 
-        return calib_amax, calib_amin
+        return calib_amax, self._calib_amin
 
     # pylint:disable=missing-docstring
     def __str__(self):
