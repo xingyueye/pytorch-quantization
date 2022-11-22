@@ -78,13 +78,13 @@ class AsymHistogramCalibrator(_Calibrator):
         else:
             self._calib_amin.copy_(torch.min(self._calib_amin, local_amin).data)
             
-        if torch.min(x) < 0.:
-            logging.log_first_n(
-                logging.INFO,
-                ("Calibrator encountered negative values. It shouldn't happen after ReLU. "
-                 "Make sure this is the right tensor to calibrate."),
-                1)
-            x = x.abs()
+        # if torch.min(x) < 0.:
+        #     logging.log_first_n(
+        #         logging.INFO,
+        #         ("Calibrator encountered negative values. It shouldn't happen after ReLU. "
+        #          "Make sure this is the right tensor to calibrate."),
+        #         1)
+        #     x = x.abs()
 
         x = x.float()
 
@@ -98,13 +98,20 @@ class AsymHistogramCalibrator(_Calibrator):
                 # first time it uses num_bins to compute histogram.
                 self._calib_hist, self._calib_bin_edges = np.histogram(x_np, bins=self._num_bins)
             else:
-                temp_amax = np.max(x_np)
+                temp_amax, temp_amin = np.max(x_np), np.min(x_np)
                 if temp_amax > self._calib_bin_edges[-1]:
                     # increase the number of bins
                     width = self._calib_bin_edges[1] - self._calib_bin_edges[0]
                     # NOTE: np.arange may create an extra bin after the one containing temp_amax
                     new_bin_edges = np.arange(self._calib_bin_edges[-1] + width, temp_amax + width, width)
                     self._calib_bin_edges = np.hstack((self._calib_bin_edges, new_bin_edges))
+                    # print(self._calib_bin_edges[-1])
+                if temp_amin < self._calib_bin_edges[0]:
+                    # increase the number of bins
+                    width = self._calib_bin_edges[1] - self._calib_bin_edges[0]
+                    new_bin_edges = np.arange(temp_amin - width, self._calib_bin_edges[0], width)
+                    self._calib_bin_edges = np.hstack((new_bin_edges, self._calib_bin_edges))
+                    # print(self._calib_bin_edges[0])
                 hist, self._calib_bin_edges = np.histogram(x_np, bins=self._calib_bin_edges)
                 hist[:len(self._calib_hist)] += self._calib_hist
                 self._calib_hist = hist
