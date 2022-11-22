@@ -23,6 +23,7 @@ import torch
 from torch import nn
 
 from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant, lsq_fake_tensor_quant, lsq_plus_fake_tensor_quant
+from pytorch_quantization.tensor_quant import LSQFakeTensorQuantFunction, LSQPLUSFakeTensorQuantFunction, FakeTensorQuantFunction, StableLSQFakeTensorQuantFunction
 from pytorch_quantization.nn.modules.clip import Clip
 from pytorch_quantization.nn.modules.grad_scale import GradScale
 
@@ -31,6 +32,20 @@ from pytorch_quantization import calib
 import pytorch_quantization.utils as quant_utils
 
 __all__ = ['TensorQuantizer']
+
+FAKE_QUANT_FUNC_MAP={
+    "qat": FakeTensorQuantFunction,
+    "lsq": LSQFakeTensorQuantFunction,
+    "stable_lsq": StableLSQFakeTensorQuantFunction,
+    "lsq_plus": LSQPLUSFakeTensorQuantFunction
+}
+
+CALIB_METHOD_MAP={
+    "histogram": calib.HistogramCalibrator,
+    "asym_histogram": calib.AsymHistogramCalibrator,
+    "max": calib.MaxCalibrator,
+    "minmax": calib.MinMaxCalibrator
+}
 
 class TensorQuantizer(nn.Module):
     """Tensor quantizer module
@@ -103,7 +118,8 @@ class TensorQuantizer(nn.Module):
             self._learn_scale_init = False
             self._learn_scale_type = quant_desc._learn_scale_type
             # self.grad_scale = GradScale(self._num_bits, self._unsigned, use_sqrt=True if self._learn_scale_type == 'stable_lsq' else False)
-            self.grad_scale = 0.0
+            self.grad_scale = 1.0
+            self.fake_quant_func = FAKE_QUANT_FUNC_MAP[self._learn_scale_type]()
         
             if quant_desc._learn_scale_type == 'lsq_plus':
                 self.register_buffer('_amin', torch.tensor(0.0))
@@ -117,20 +133,22 @@ class TensorQuantizer(nn.Module):
         else:
             self.min_bound = - self.max_bound - 1
 
-        if quant_desc.calib_method == "histogram":
-            logging.info("Creating histogram calibrator")
-            self._calibrator = calib.HistogramCalibrator(
+        self._calibrator = CALIB_METHOD_MAP[quant_desc.calib_method](
                 num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
-        if quant_desc.calib_method == "asym_histogram":
-            logging.info("Creating histogram calibrator")
-            self._calibrator = calib.AsymHistogramCalibrator(
-                num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
-        elif quant_desc.calib_method == "max":
-            logging.info("Creating Max calibrator")
-            self._calibrator = calib.MaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
-        elif quant_desc.calib_method == "minmax":
-            logging.info("Creating MinMax calibrator")
-            self._calibrator = calib.MinMaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
+        # if quant_desc.calib_method == "histogram":
+        #     logging.info("Creating histogram calibrator")
+        #     self._calibrator = calib.HistogramCalibrator(
+        #         num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
+        # if quant_desc.calib_method == "asym_histogram":
+        #     logging.info("Creating histogram calibrator")
+        #     self._calibrator = calib.AsymHistogramCalibrator(
+        #         num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
+        # elif quant_desc.calib_method == "max":
+        #     logging.info("Creating Max calibrator")
+        #     self._calibrator = calib.MaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
+        # elif quant_desc.calib_method == "minmax":
+        #     logging.info("Creating MinMax calibrator")
+        #     self._calibrator = calib.MinMaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
 
     # pylint:disable=missing-docstring
     @property
@@ -394,6 +412,7 @@ class TensorQuantizer(nn.Module):
                 self.init_learn_scale(inputs)
                 self._learn_scale_init=True
             # scale, self._amax = self.grad_scale(inputs, self._scale)
+            amax = self._amax
             if self.grad_scale == 0.0:
                 numel = inputs.numel()
                 self.grad_scale = torch.tensor(1.0 / ((self.max_bound * numel) ** 0.5), device=inputs.device)
@@ -404,16 +423,22 @@ class TensorQuantizer(nn.Module):
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
-                if self._learn_scale:
-                    if self._learn_scale_type == 'lsq':
-                        outputs = lsq_fake_tensor_quant(inputs, self._scale, self._num_bits, self._unsigned, self._narrow_range, self.grad_scale)
-                    elif self._learn_scale_type == 'stable_lsq':
-                        scale = self._scale ** 2
-                        outputs = lsq_fake_tensor_quant(inputs, scale, self._num_bits, self._unsigned, self._narrow_range)
-                    elif self._learn_scale_type == 'lsq_plus':
-                        outputs = lsq_plus_fake_tensor_quant(inputs, self._scale, self._offset, self.min_bound, self.max_bound, self.grad_scale)
-                else:
-                    outputs = fake_tensor_quant(inputs, amax, self._num_bits, self._unsigned, self._narrow_range)
+                kwargs = {'amax': amax, 'num_bits': self._num_bits, 'unsigned':self._unsigned, 'narrow_range':self._narrow_range,
+                'max_bound': self.max_bound, 'min_bound':self.min_bound,
+                'grad_scale':self.grad_scale if hasattr(self, 'grad_scale') else 1.0,
+                'scale':self._scale if hasattr(self, '_scale') else None, 
+                'offset':self._offset if hasattr(self, '_offset') else None}
+                outputs = self.fake_quant_func(inputs, **kwargs)
+                # if self._learn_scale:
+                #     if self._learn_scale_type == 'lsq':
+                #         outputs = lsq_fake_tensor_quant(inputs, self._scale, self._num_bits, self._unsigned, self._narrow_range, self.grad_scale)
+                #     elif self._learn_scale_type == 'stable_lsq':
+                #         scale = self._scale ** 2
+                #         outputs = lsq_fake_tensor_quant(inputs, scale, self._num_bits, self._unsigned, self._narrow_range)
+                #     elif self._learn_scale_type == 'lsq_plus':
+                #         outputs = lsq_plus_fake_tensor_quant(inputs, self._scale, self._offset, self.min_bound, self.max_bound, self.grad_scale)
+                # else:
+                #     outputs = fake_tensor_quant(inputs, amax, self._num_bits, self._unsigned, self._narrow_range)
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
                     raise Exception("Exporting to ONNX in fp16 is not supported. Please export in fp32, i.e. disable AMP.")
