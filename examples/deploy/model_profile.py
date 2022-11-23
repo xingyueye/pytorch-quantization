@@ -73,7 +73,7 @@ if __name__ == '__main__':
     model_file, onnx_path, onnx_rmqdq_path, cache_rmqdq_path, prep_path, \
     trt_fp16_epath, trt_int8_epath, trt_int8_rmqdq_epath, profile_file = prepare_env(args.model_zoo_path)
 
-    fprof = open(profile_file, 'w')
+    fprof = open(profile_file, 'a')
 
     with open(model_file, 'r') as mfile:
         lines = mfile.readlines()
@@ -217,4 +217,5 @@ if __name__ == '__main__':
                                                                                                     int8_rmqdq_qps
                                                                                                     )
             fprof.write(prof_str)
+            fprof.flush()
     fprof.close()
