@@ -15,6 +15,7 @@ resnetrs152,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnetrs152_ca
 resnetrs270,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnetrs270_calib.pth, 0
 resnext50_32x4d,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnext50_32x4d_calib.pth, 5
 resnext50d_32x4d,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/resnext50d_32x4d_calib.pth, 1
+tv_resnet50,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/tv_resnet50_calib.pth, 0
 efficientnet_b0,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_b0_calib.pth, 8
 efficientnet_b1,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_b1_calib.pth, 10
 efficientnet_b2,https://s3plus.sankuai.com/automl-lee/MPQ/Timm_models/efficientnet_b2_calib.pth, 11
