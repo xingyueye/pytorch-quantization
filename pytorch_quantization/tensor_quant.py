@@ -22,7 +22,9 @@ import yaml
 from absl import logging
 
 import torch
+import torch.nn as nn
 from torch.autograd import Function
+from pytorch_quantization.nn.functional import GradScaleFunction
 
 class ScaledQuantDescriptor():
     """Supportive descriptor of quantization
@@ -249,7 +251,7 @@ class LSQFakeTensorQuantFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, scale, num_bits=8, unsigned=False, narrow_range=True, grad_scale=1.0, **kwargs):
+    def forward(ctx, inputs, scale, num_bits=8, unsigned=False, narrow_range=True):
         """
 
         Follow tensorflow convention, max value is passed in and used to decide scale, instead of inputing scale
@@ -280,7 +282,7 @@ class LSQFakeTensorQuantFunction(Function):
             min_bound = -max_bound
         else:
             min_bound = -max_bound - 1
-        ctx.save_for_backward(inputs, scale, max_bound, min_bound, grad_scale)
+        ctx.save_for_backward(inputs, scale, max_bound, min_bound)
         outputs, scale = _tensor_quant_scale(inputs, scale, num_bits, unsigned, narrow_range)
         return outputs * scale.to(inputs.dtype)
 
@@ -298,7 +300,7 @@ class LSQFakeTensorQuantFunction(Function):
             grad_inputs: A tensor of gradient.
             grad_scale: A tensor of gradient of scale.
         """
-        inputs, scale, max_bound, min_bound, _grad_scale = ctx.saved_tensors
+        inputs, scale, max_bound, min_bound = ctx.saved_tensors
         if grad_outputs.dtype == torch.half:
             max_bound = max_bound.half()
             min_bound = min_bound.half()
@@ -320,9 +322,29 @@ class LSQFakeTensorQuantFunction(Function):
             grad_scale = grad_scale.sum(dim=dim, keepdim=True)
         else:
             grad_scale = grad_scale.sum()
-        return grad_inputs, grad_scale*_grad_scale, None, None, None, None
+        return grad_inputs, grad_scale, None, None, None
 
-class StableLSQFakeTensorQuantFunction(Function):
+class LSQFakeQuantizer(nn.Module):
+    """
+        LSQ Quantization Class
+    """
+    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
+        super().__init__()
+        self.num_bits = num_bits
+        self.unsigned = unsigned
+        self.narrow_range = narrow_range
+        self.scale_for_grad = None
+
+    def forward(self, inputs, scale, **kwargs):
+        if self.scale_for_grad is None:
+            numel = inputs.numel()
+            max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=scale.device)
+            self.scale_for_grad = torch.tensor(1.0 / ((max_bound * numel) ** 0.5), device=inputs.device)
+        _scale = balance_grad_for_scale(scale, self.scale_for_grad)
+        outputs = lsq_fake_tensor_quant(inputs, _scale, self.num_bits, self.unsigned, self.narrow_range)
+        return outputs
+
+# class StableLSQFakeTensorQuantFunction(Function):
     """A tensor quantization function with learnable scales
 
     Take an input tensor and its quantization scale, output an quantized tensor. The granularity of scale is the same with the
@@ -334,7 +356,7 @@ class StableLSQFakeTensorQuantFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, scale, num_bits=8, unsigned=False, narrow_range=True, grad_scale=1.0, **kwargs):
+    def forward(ctx, inputs, scale, num_bits=8, unsigned=False, narrow_range=True):
         """
 
         Follow tensorflow convention, max value is passed in and used to decide scale, instead of inputing scale
@@ -365,7 +387,7 @@ class StableLSQFakeTensorQuantFunction(Function):
             min_bound = -max_bound
         else:
             min_bound = -max_bound - 1
-        ctx.save_for_backward(inputs, scale, max_bound, min_bound, grad_scale)
+        ctx.save_for_backward(inputs, scale, max_bound, min_bound)
         scale = scale ** 2
         outputs, scale = _tensor_quant_scale(inputs, scale, num_bits, unsigned, narrow_range)
         return outputs * scale.to(inputs.dtype)
@@ -406,8 +428,29 @@ class StableLSQFakeTensorQuantFunction(Function):
             grad_scale = grad_scale.sum(dim=dim, keepdim=True)
         else:
             grad_scale = grad_scale.sum()
-        grad_scale = 2 * scale * ( grad_scale* _grad_scale)
-        return grad_inputs, grad_scale, None, None, None, None
+        grad_scale = 2 * scale * ( grad_scale)
+        return grad_inputs, grad_scale, None, None, None
+
+class StableLSQFakeQuantizer(nn.Module):
+    """
+        StableLSQ Quantization Class
+    """
+    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
+        super().__init__()
+        self.num_bits = num_bits
+        self.unsigned = unsigned
+        self.narrow_range = narrow_range
+        self.scale_for_grad = None
+
+    def forward(self, inputs, scale, **kwargs):
+        if self.scale_for_grad is None:
+            numel = inputs.numel()
+            max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=scale.device)
+            self.scale_for_grad = torch.tensor(1.0 / ((max_bound * numel) ** 0.5), device=inputs.device)
+        step_size = scale ** 2
+        _scale = balance_grad_for_scale(step_size, self.scale_for_grad)
+        outputs = lsq_fake_tensor_quant(inputs, _scale, self.num_bits, self.unsigned, self.narrow_range)
+        return outputs
 
 class TensorQuantFunction(Function):
     """A universal tensor quantization function
@@ -479,7 +522,7 @@ class FakeTensorQuantFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, amax, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
+    def forward(ctx, inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
         ctx.save_for_backward(inputs, amax)
         outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
         return outputs / scale.to(inputs.dtype)
@@ -490,6 +533,20 @@ class FakeTensorQuantFunction(Function):
         zero = grad_outputs.new_zeros(1)
         grad_inputs = torch.where(inputs.abs() <= amax, grad_outputs, zero)
         return grad_inputs, None, None, None, None
+
+class NaiveFakeQuantizer(nn.Module):
+    """
+        Naive Quantization Class
+    """
+    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
+        super().__init__()
+        self.num_bits = num_bits
+        self.unsigned = unsigned
+        self.narrow_range = narrow_range
+
+    def forward(self, inputs, amax, **kwargs):
+        outputs = fake_tensor_quant(inputs, amax, self.num_bits, self.unsigned, self.narrow_range)
+        return outputs
 
 class LSQPLUSFakeTensorQuantFunction(Function):
     """A tensor quantization function with learnable scales
@@ -503,7 +560,7 @@ class LSQPLUSFakeTensorQuantFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, scale, offset, min_bound=0, max_bound=255, grad_scale=1.0, **kwargs):
+    def forward(ctx, inputs, scale, offset, num_bits=8, unsigned=True, narrow_range=True):
         """
 
         Follow tensorflow convention, max value is passed in and used to decide scale, instead of inputing scale
@@ -529,13 +586,16 @@ class LSQPLUSFakeTensorQuantFunction(Function):
             ValueError:
         """
         # assert unsigned, 'Function "_tensor_quant_scale_offset" only support signed asymmetric quantization'
-        # max_bound = torch.tensor((2.0**(num_bits) - 1), device=scale.device)
-        # min_bound = torch.tensor(0.0, device=scale.device)
-        # max_bound = torch.tensor((2.0**(num_bits - 1)) - 1.0, device=scale.device)
-        # min_bound = -max_bound - 1
+        max_bound = torch.tensor((2.0**(num_bits - 1 + int(unsigned))) - 1.0, device=scale.device)
+        if unsigned:
+            min_bound = torch.tensor(0.0, device=scale.device)
+        elif narrow_range:
+            min_bound = -max_bound
+        else:
+            min_bound = -max_bound - 1
 
-        ctx.save_for_backward(inputs, scale, offset, max_bound, min_bound, grad_scale)
-        outputs = _tensor_quant_scale_offset(inputs, scale, offset, min_bound, max_bound)
+        ctx.save_for_backward(inputs, scale, offset, max_bound, min_bound)
+        outputs = _tensor_quant_scale_offset(inputs, scale, offset, max_bound, min_bound)
         return outputs
 
     @staticmethod
@@ -552,7 +612,7 @@ class LSQPLUSFakeTensorQuantFunction(Function):
             grad_inputs: A tensor of gradient.
             grad_scale: A tensor of gradient of scale.
         """
-        inputs, scale, offset, max_bound, min_bound, grad_scale = ctx.saved_tensors
+        inputs, scale, offset, max_bound, min_bound = ctx.saved_tensors
         if grad_outputs.dtype == torch.half:
             max_bound = max_bound.half()
             min_bound = min_bound.half()
@@ -569,8 +629,8 @@ class LSQPLUSFakeTensorQuantFunction(Function):
         ones = grad_outputs.new_ones(1)
         grad_offset = torch.where((fake_quant_point < max_bound)*(fake_quant_point > min_bound), zero, ones)
 
-        grad_scale = grad_scale * grad_outputs * grad_scale
-        grad_offset = grad_offset * grad_outputs * grad_scale
+        grad_scale = grad_scale * grad_outputs
+        grad_offset = grad_offset * grad_outputs
 
         if len(scale.size()) > 0:
             dim = []
@@ -585,8 +645,28 @@ class LSQPLUSFakeTensorQuantFunction(Function):
         
         return grad_inputs, grad_scale, grad_offset, None, None, None
 
+class LSQPlusFakeQuantizer(nn.Module):
+    """
+        LSQ+ Quantization Class
+    """
+    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
+        super().__init__()
+        self.num_bits = num_bits
+        self.unsigned = unsigned
+        self.narrow_range = narrow_range
+        self.scale_for_grad = None
 
-def _tensor_quant_scale_offset(inputs, scale, offset, min_bound=0, max_bound=255):
+    def forward(self, inputs, scale, offset, **kwargs):
+        if self.scale_for_grad is None:
+            numel = inputs.numel()
+            max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=scale.device)
+            self.scale_for_grad = torch.tensor(1.0 / ((max_bound * numel) ** 0.5), device=inputs.device)
+        _scale = balance_grad_for_scale(scale, self.scale_for_grad)
+        _offset = balance_grad_for_scale(offset, self.scale_for_grad)
+        outputs = lsq_plus_fake_tensor_quant(inputs, _scale, _offset, self.num_bits, self.unsigned, self.narrow_range)
+        return outputs
+
+def _tensor_quant_scale_offset(inputs, scale, offset, max_bound=127, min_bound=-128):
     """
         Forward Function for Signed Asymmetric Quantization.
         Quantization Scheme: x_q = round(clamp((x - shift)/scale, min_bound, max_bound)
@@ -597,9 +677,6 @@ def _tensor_quant_scale_offset(inputs, scale, offset, min_bound=0, max_bound=255
     #                   scale.size(), inputs.size())
 
     # logging.debug("{} bits quantization on shape {} tensor.".format(num_bits, inputs.size()))
-
-
-
     # Computation must be in FP32 to prevent potential over flow.
     input_dtype = inputs.dtype
     if inputs.dtype == torch.half:
@@ -780,3 +857,4 @@ fake_tensor_quant = FakeTensorQuantFunction.apply
 lsq_fake_tensor_quant = LSQFakeTensorQuantFunction.apply
 lsq_plus_fake_tensor_quant = LSQPLUSFakeTensorQuantFunction.apply
 fake_affine_tensor_quant = FakeAffineTensorQuantFunction.apply
+balance_grad_for_scale = GradScaleFunction.apply

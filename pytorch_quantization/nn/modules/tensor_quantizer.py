@@ -23,7 +23,7 @@ import torch
 from torch import nn
 
 from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant, lsq_fake_tensor_quant, lsq_plus_fake_tensor_quant
-from pytorch_quantization.tensor_quant import LSQFakeTensorQuantFunction, LSQPLUSFakeTensorQuantFunction, FakeTensorQuantFunction, StableLSQFakeTensorQuantFunction
+from pytorch_quantization.tensor_quant import LSQFakeQuantizer, LSQPlusFakeQuantizer, NaiveFakeQuantizer, StableLSQFakeQuantizer
 from pytorch_quantization.nn.modules.clip import Clip
 from pytorch_quantization.nn.modules.grad_scale import GradScale
 
@@ -34,10 +34,10 @@ import pytorch_quantization.utils as quant_utils
 __all__ = ['TensorQuantizer']
 
 FAKE_QUANT_FUNC_MAP={
-    "qat": FakeTensorQuantFunction,
-    "lsq": LSQFakeTensorQuantFunction,
-    "stable_lsq": StableLSQFakeTensorQuantFunction,
-    "lsq_plus": LSQPLUSFakeTensorQuantFunction
+    "qat": NaiveFakeQuantizer,
+    "lsq": LSQFakeQuantizer,
+    "stable_lsq": StableLSQFakeQuantizer,
+    "lsq_plus": LSQPlusFakeQuantizer
 }
 
 CALIB_METHOD_MAP={
@@ -50,7 +50,7 @@ CALIB_METHOD_MAP={
 class TensorQuantizer(nn.Module):
     """Tensor quantizer module
 
-    This module uses tensor_quant or fake_tensor_quant function to quantize a tensor. And wrappers variable, moving
+    This module uses tensor_quant or fake_tensor_quant funßtion to quantize a tensor. And wrappers variable, moving
     statistics we'd want when training a quantized network.
 
     Experimental features:
@@ -118,20 +118,10 @@ class TensorQuantizer(nn.Module):
             self._learn_scale_init = False
             self._learn_scale_type = quant_desc._learn_scale_type
             # self.grad_scale = GradScale(self._num_bits, self._unsigned, use_sqrt=True if self._learn_scale_type == 'stable_lsq' else False)
-            self.grad_scale = 1.0
-            self.fake_quant_func = FAKE_QUANT_FUNC_MAP[self._learn_scale_type]()
-        
             if quant_desc._learn_scale_type == 'lsq_plus':
                 self.register_buffer('_amin', torch.tensor(0.0))
                 self._unsigned = True
-
-        self.max_bound = torch.tensor((2.0**(self._num_bits - 1 + int(self._unsigned))) - 1.0)
-        if self._unsigned:
-            self.min_bound = torch.tensor(0.0)
-        elif self._narrow_range:
-            self.min_bound = - self.max_bound
-        else:
-            self.min_bound = - self.max_bound - 1
+            self.fake_quant_func = FAKE_QUANT_FUNC_MAP[self._learn_scale_type](self.num_bits, self.unsigned, self.narrow_range)
 
         self._calibrator = CALIB_METHOD_MAP[quant_desc.calib_method](
                 num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
@@ -413,19 +403,12 @@ class TensorQuantizer(nn.Module):
                 self._learn_scale_init=True
             # scale, self._amax = self.grad_scale(inputs, self._scale)
             amax = self._amax
-            if self.grad_scale == 0.0:
-                numel = inputs.numel()
-                self.grad_scale = torch.tensor(1.0 / ((self.max_bound * numel) ** 0.5), device=inputs.device)
-                self.min_bound = self.min_bound.to(self.grad_scale.device)
-                self.max_bound = self.max_bound.to(self.grad_scale.device)
         else:
             amax = self._get_amax(inputs)
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
-                kwargs = {'amax': amax, 'num_bits': self._num_bits, 'unsigned':self._unsigned, 'narrow_range':self._narrow_range,
-                'max_bound': self.max_bound, 'min_bound':self.min_bound,
-                'grad_scale':self.grad_scale if hasattr(self, 'grad_scale') else 1.0,
+                kwargs = {'amax': amax,
                 'scale':self._scale if hasattr(self, '_scale') else None, 
                 'offset':self._offset if hasattr(self, '_offset') else None}
                 outputs = self.fake_quant_func(inputs, **kwargs)
