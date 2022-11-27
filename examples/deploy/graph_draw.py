@@ -11,7 +11,7 @@ if __name__ == '__main__':
     assert engine_json_name is not None and engine_json_name[-5:] == '.json', "Not valid {} file".format(engine_json_name)
 
     set_wide_display()
-    plan = EnginePlan(engine_json_name)
+    plan = EnginePlan(engine_json_path)
 
     df = plan.df
     print(df['Name'])
