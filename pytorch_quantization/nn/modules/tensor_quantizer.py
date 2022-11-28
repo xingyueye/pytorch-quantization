@@ -392,6 +392,9 @@ class TensorQuantizer(nn.Module):
                 -bound - 1 if not self._unsigned else 0, bound)
 
         return outputs
+    
+    def init_learn_scale(self, inputs=None):
+        pass
 
     def _quant_forward(self, inputs):
         """Quantized forward pass."""

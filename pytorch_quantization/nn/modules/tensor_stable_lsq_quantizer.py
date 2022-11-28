@@ -101,17 +101,12 @@ class StableLSQTensorQuantizer(LSQTensorQuantizer):
         else:
             self._amax.copy_(calib_amax)
 
-    def _stable_lsq_init(self):
+    def _param_init(self, inputs=None):
         qmax = 2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0
         value = torch.nn.Parameter((self._amax / qmax) ** 0.5, requires_grad=True)
         if hasattr(self, '_scale'):
             del self._scale
         self.register_parameter('_scale', value)
-
-    def init_learn_scale(self, inputs=None):
-        """Initialize learned scale from PTQ amax or lsq_init"""
-        self._stable_lsq_init()
-        self._learn_scale_init = True  
 
     def _quant_forward(self, inputs):
         """Quantized forward pass."""

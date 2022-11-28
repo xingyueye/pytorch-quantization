@@ -110,7 +110,7 @@ class LSQPlusTensorQuantizer(LSQTensorQuantizer):
         else:
             self._amin.copy_(calib_amin)
 
-    def _lsq_plus_init(self):
+    def _param_init(self, inputs=None):
         range = self._amax - self._amin
         qmax = 2.0**(self._num_bits) - 1.0
         scale = torch.nn.Parameter(range / qmax, requires_grad=True)
@@ -122,11 +122,6 @@ class LSQPlusTensorQuantizer(LSQTensorQuantizer):
         if hasattr(self, '_offset'):
             del self._offset
         self.register_parameter('_offset', offset)
-
-    def init_learn_scale(self, inputs=None):
-        """Initialize learned scale from PTQ amax or lsq_init"""
-        self._lsq_plus_init()
-        self._learn_scale_init = True  
 
     def _quant_forward(self, inputs):
         """Quantized forward pass."""
