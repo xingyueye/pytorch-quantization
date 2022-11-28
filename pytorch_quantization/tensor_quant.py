@@ -104,13 +104,17 @@ class ScaledQuantDescriptor():
         self._narrow_range = kwargs.pop('narrow_range', False)
 
         # add learn_scale configs
-        self._learn_scale_type = kwargs.pop('_learn_scale_type', None)     # lsq / stable_lsq / None
+        self._learn_scale_type = kwargs.pop('_learn_scale_type', 'Naive')     # lsq / stable_lsq / None
         self._learn_scale = False if self._learn_scale_type is None else True
 
         if kwargs:
             raise TypeError("Unused keys: {}".format(kwargs.keys()))
 
     # pylint:disable=missing-docstring
+    @property
+    def learn_scale_type(self):
+        return self._learn_scale_type
+
     @property
     def num_bits(self):
         return self._num_bits

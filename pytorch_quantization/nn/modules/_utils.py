@@ -24,9 +24,15 @@ from absl import logging
 
 from torch import nn
 
-from pytorch_quantization.nn import TensorQuantizer
+from pytorch_quantization.nn import TensorQuantizer, LSQTensorQuantizer, LSQPlusTensorQuantizer, StableLSQTensorQuantizer
 from pytorch_quantization.tensor_quant import QuantDescriptor, QUANT_DESC_8BIT_PER_TENSOR
 
+TENSOR_QUANTIZER_MAP={
+    "naive": TensorQuantizer,
+    "lsq": LSQTensorQuantizer,
+    "stable_lsq": StableLSQTensorQuantizer,
+    "lsq_plus": LSQPlusTensorQuantizer
+}
 
 class QuantMixin():
     """Mixin class for adding basic quantization logic to quantized modules"""
@@ -77,12 +83,14 @@ class QuantMixin():
                      if not quant_desc_weight.fake_quant else "fake ",
                      quant_desc_weight.num_bits, self.__class__.__name__, quant_desc_weight.axis)
 
+        input_tensor_quantizer = TENSOR_QUANTIZER_MAP[quant_desc_input.learn_scale_type]
+        weight_tensor_quantizer = TENSOR_QUANTIZER_MAP[quant_desc_weight.learn_scale_type]
         if num_layers is None:
-            self._input_quantizer = TensorQuantizer(quant_desc_input)
-            self._weight_quantizer = TensorQuantizer(quant_desc_weight)
+            self._input_quantizer = input_tensor_quantizer(quant_desc_input)
+            self._weight_quantizer = weight_tensor_quantizer(quant_desc_weight)
         else:
-            self._input_quantizers = nn.ModuleList([TensorQuantizer(quant_desc_input) for _ in range(num_layers)])
-            self._weight_quantizers = nn.ModuleList([TensorQuantizer(quant_desc_weight) for _ in range(num_layers)])
+            self._input_quantizers = nn.ModuleList([input_tensor_quantizer(quant_desc_input) for _ in range(num_layers)])
+            self._weight_quantizers = nn.ModuleList([weight_tensor_quantizer(quant_desc_weight) for _ in range(num_layers)])
 
     # pylint:disable=missing-docstring
     @property
