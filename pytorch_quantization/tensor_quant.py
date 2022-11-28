@@ -104,7 +104,7 @@ class ScaledQuantDescriptor():
         self._narrow_range = kwargs.pop('narrow_range', False)
 
         # add learn_scale configs
-        self._learn_scale_type = kwargs.pop('_learn_scale_type', 'Naive')     # lsq / stable_lsq / None
+        self._learn_scale_type = kwargs.pop('_learn_scale_type', 'naive')     # lsq / stable_lsq / lsq_plus / naive
         self._learn_scale = False if self._learn_scale_type is None else True
 
         if kwargs:
