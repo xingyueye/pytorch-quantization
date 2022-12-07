@@ -155,3 +155,8 @@ caffe2.egg-info
 # Visual Studio Code files
 .vscode
 .vs
+.DS_Store
+.idea
+*.onnx
+*.gv
+*.svg
