@@ -108,7 +108,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
                                                                                               calib_method='max', axis=1)))
 
             fx_utils.add_quantizer(node, model_traced, (0, 1), (input_quantizer_name, weight_quantizer_name))
-        elif node.op == "call_module" and node.target in _MODULES_QUANT_ONLY_INPUT:
+        elif node.target in _MODULES_QUANT_ONLY_INPUT:
             # Add quantizer to global pooling
             avgpool_quantizer_name = F"{node.target}.input_quantizer"
             model_traced.add_submodule(avgpool_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
