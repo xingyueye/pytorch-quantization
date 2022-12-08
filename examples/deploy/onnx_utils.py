@@ -187,6 +187,7 @@ def onnx_remove_qdqnode(onnx_model):
     scale_node_list = []
     zero_node_list = []
     activation_map = {}
+    quant_node_list = []
     for node_id, node in enumerate(graph.node):
         if node.op_type == "QuantizeLinear":
             # node input
@@ -200,6 +201,7 @@ def onnx_remove_qdqnode(onnx_model):
             in_rename_map[out_name] = in_name
             scale_node_list.append(scale_name)
             zero_node_list.append(zero_name)
+            quant_node_list.append(node)
             # for i, node in enumerate(graph.node):
             #     if node.output[0] == scale_name:
             #         if len(node.attribute[0].t.dims) > 0:
@@ -222,8 +224,10 @@ def onnx_remove_qdqnode(onnx_model):
                                 activation_map[in_name] = struct.pack('>f', val).hex()
                         else:
                             activation_map[in_name] = struct.pack('>f', val).hex()
-            # remove QuantizeLinear node
-            graph.node.remove(nodes[node_id])
+
+    # Remove QuantizeLinear node
+    for quant_node in quant_node_list:
+        graph.node.remove(quant_node)
 
 
     # relink
@@ -235,6 +239,7 @@ def onnx_remove_qdqnode(onnx_model):
 
     in_rename_map = {}
     # activation_map = {}
+    dequant_node_list = []
     for node_id, node in enumerate(graph.node):
        if node.op_type == "DequantizeLinear":
            in_name = node.input[0]
@@ -243,9 +248,14 @@ def onnx_remove_qdqnode(onnx_model):
            # print(scale_name)
            out_name = node.output[0]
            in_rename_map[out_name] = in_name
-           graph.node.remove(nodes[node_id])
+           # remove later
+           dequant_node_list.append(node)
            scale_node_list.append(scale_name)
            zero_node_list.append(zero_name)
+
+    # Remove DequantizeLinear node
+    for dequant_node in dequant_node_list:
+        graph.node.remove(dequant_node)
 
     # relink
     for node_id, node in enumerate(graph.node):
@@ -284,13 +294,13 @@ if __name__ == '__main__':
 
     onnx_file = sys.argv[1]
     model = onnx.load(onnx_file)
-    # model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
-    #
-    # onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
-    # onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
-    # onnx.save(model, os.path.join(onnx_dir, onnx_new_name))
-    # cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
-    # save_calib_cache_file(cache_name, activation_map)
+    model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
+
+    onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
+    onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
+    onnx.save(model_wo_qdq, os.path.join(onnx_dir, onnx_new_name))
+    cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
+    save_calib_cache_file(os.path.join(onnx_dir, cache_name), activation_map)
 
 
     # onnx_fuse = onnx_conv_horizon_fuse(model)
@@ -298,10 +308,10 @@ if __name__ == '__main__':
     # onnx_new_name = onnx_name.replace('.onnx', '_fuse_horizon.onnx')
     # onnx.save(onnx_fuse, os.path.join(onnx_dir, onnx_new_name))
 
-    onnx_insert = onnx_add_insert_qdqnode(model)
-    model_wo_qdq, activation_map = onnx_remove_qdqnode(onnx_insert)
-    onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
-    onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
-    onnx.save(onnx_insert, os.path.join(onnx_dir, onnx_new_name))
-    cache_name = onnx_new_name.replace('.onnx', '_add_insert_qdq_calibration.cache')
-    save_calib_cache_file(cache_name, activation_map)
+    # onnx_insert = onnx_add_insert_qdqnode(model)
+    # model_wo_qdq, activation_map = onnx_remove_qdqnode(onnx_insert)
+    # onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
+    # onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
+    # onnx.save(onnx_insert, os.path.join(onnx_dir, onnx_new_name))
+    # cache_name = onnx_new_name.replace('.onnx', '_add_insert_qdq_calibration.cache')
+    # save_calib_cache_file(cache_name, activation_map)
