@@ -16,8 +16,17 @@ _MODULES_QUANT_INPUT_AND_WEIGHTS_TRANS = [
 ]
 
 _MODULES_QUANT_ONLY_INPUT = [
-    "maxpool",
-    "avgpool",
+    # "maxpool",
+    # "avgpool",
+    nn.functional.avg_pool1d,
+    nn.functional.avg_pool2d,
+    nn.functional.avg_pool3d,
+    nn.functional.adaptive_avg_pool1d,
+    nn.functional.adaptive_avg_pool2d,
+    nn.functional.adaptive_avg_pool3d,
+    nn.functional.max_pool1d,
+    nn.functional.max_pool2d,
+    nn.functional.max_pool3d
 ]
 
 
@@ -80,7 +89,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
             model_traced.add_submodule(input_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
                                                                                              calib_method=method)))
             model_traced.add_submodule(weight_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
-                                                                                              calib_method=method, axis=0)))
+                                                                                              calib_method='max', axis=0)))
 
             fx_utils.add_quantizer(node, model_traced, (0, 1), (input_quantizer_name, weight_quantizer_name))
         elif node.target in _MODULES_QUANT_INPUT_AND_WEIGHTS_TRANS:
@@ -96,7 +105,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
             model_traced.add_submodule(input_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
                                                                                              calib_method=method)))
             model_traced.add_submodule(weight_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
-                                                                                              calib_method=method, axis=1)))
+                                                                                              calib_method='max', axis=1)))
 
             fx_utils.add_quantizer(node, model_traced, (0, 1), (input_quantizer_name, weight_quantizer_name))
         elif node.op == "call_module" and node.target in _MODULES_QUANT_ONLY_INPUT:

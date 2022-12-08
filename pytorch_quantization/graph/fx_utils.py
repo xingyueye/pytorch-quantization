@@ -119,6 +119,22 @@ class LowerConvLinearTracer(fx.Tracer):
             return False
         return super().is_leaf_module(m, qualname)
 
+class LowerTracer(fx.Tracer):
+    """Tracer lowering Conv2d and Linear module
+
+    By default, nn.Module is a leaf. When we need to trace down to nn.functional, must set is_leaf_module to False
+    """
+    def is_leaf_module(self, m : nn.Module, qualname : str):
+        if isinstance(m, (nn.Conv2d, nn.Linear)):
+            return False
+        if isinstance(m, (nn.AvgPool1d, nn.AvgPool2d, nn.AvgPool3d)):
+            return False
+        if isinstance(m, (nn.AdaptiveAvgPool1d, nn.AdaptiveAvgPool2d, nn.AdaptiveAvgPool3d)):
+            return False
+        if isinstance(m, (nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d)):
+            return False
+        return super().is_leaf_module(m, qualname)
+
 def add_quantizer(node, graph_module, quant_arg_ids, quantizer_names):
     """Add quantizers to input(s) of a node
 
