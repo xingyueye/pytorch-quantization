@@ -69,7 +69,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
     model.eval()
     lower_conv_linear = True
     if lower_conv_linear:
-        model_traced = fx.GraphModule(model, fx_utils.LowerConvLinearTracer().trace(model))
+        model_traced = fx.GraphModule(model, fx_utils.LowerTracer().trace(model))
     else:
         model_traced = fx.symbolic_trace(model)
 
