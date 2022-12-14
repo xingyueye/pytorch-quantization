@@ -5,7 +5,7 @@ from pytorch_quantization.nn import TensorQuantizer
 from pytorch_quantization.tensor_quant import QuantDescriptor
 from pytorch_quantization.graph import fx_utils
 from pytorch_quantization.graph.fx_pattern import ConvBnResReluTypePattern, ConvBnResTypePattern, \
-    SESiLUTypePattern, DropActDropPathAddTypePattern
+    SESiLUTypePattern, DropActDropPathAddTypePattern, MeanTypePattern
 
 _MODULES_QUANT_INPUT_AND_WEIGHTS = [
     nn.functional.conv2d,
@@ -78,6 +78,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
     conv_bn_res_pattern = fx.symbolic_trace(ConvBnResTypePattern(lower_conv_linear))
     se_silu_pattern = fx.symbolic_trace(SESiLUTypePattern(lower_conv_linear))
     drop_act_drop_add_pattern = fx.symbolic_trace(DropActDropPathAddTypePattern())
+    mean_pattern = fx.symbolic_trace(MeanTypePattern())
 
     for node in model_traced.graph.nodes:
         if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, conv_bn_res_relu_pattern.graph, conv_bn_res_relu_pattern):
@@ -112,6 +113,15 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
 
             # The matched end node is Add, whose snd input we want to add quantizer to
             fx_utils.add_quantizer(node, model_traced, (1,), (res_add_quantizer_name,))
+
+        elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, mean_pattern.graph, mean_pattern):
+            print('node: ', node, node.name)
+            mean_quantizer_name = F"{'.'.join(node.name.split('.'))}.input_quantizer"
+            model_traced.add_submodule(mean_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
+                                                                                               calib_method=method)))
+
+            # The matched end node is Add, whose snd input we want to add quantizer to
+            fx_utils.add_quantizer(node, model_traced, (0,), (mean_quantizer_name,))
 
     for node in model_traced.graph.nodes:
         if node.target in _MODULES_QUANT_INPUT_AND_WEIGHTS:

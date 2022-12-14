@@ -25,6 +25,8 @@ def get_target_type(node: fx.Node, gm: fx.GraphModule) -> Optional[Callable]:
         return type(getattr_from_fqn(gm, node.target))
     if node.op == 'call_function':
         return node.target
+    if node.op == 'call_method':
+        return node.target
     return None
 
 class NodeIterator:
@@ -49,7 +51,7 @@ class NodeIterator:
             for arg in cur_node.args:
                 if isinstance(arg, fx.Node):
                     self.stack.append(arg)
-            if cur_node.op not in ('call_module', 'call_function', 'placeholder'):
+            if cur_node.op not in ('call_module', 'call_method', 'call_function', 'placeholder'):
                 continue
             return cur_node
         raise StopIteration

@@ -85,3 +85,7 @@ class DropActDropPathAddTypePattern(torch.nn.Module):
         x = self.drop_path(x)
         x = x + identity
         return x
+
+class MeanTypePattern(torch.nn.Module):
+    def forward(self, x):
+        return x.mean(dim=(2,3), keepdim=True)
