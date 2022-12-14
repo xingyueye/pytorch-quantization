@@ -44,7 +44,7 @@ class ConvBnResTypePattern(torch.nn.Module):
         x = x + identity
         return x
 
-"SESiLU Block of EfficientNet"
+"""SESiLU Block of EfficientNet"""
 class SESiLUTypePattern(torch.nn.Module):
     def __init__(self, lower_conv=False):
         super().__init__()
@@ -65,4 +65,23 @@ class SESiLUTypePattern(torch.nn.Module):
         else:
             x = torch.nn.functional.conv2d(x, self.conv_expand.weight)
         x = identity * self.gate(x)
+        return x
+
+"""Residual Type of EfficientNet"""
+class DropActDropPathAddTypePattern(torch.nn.Module):
+    """Create a pattern of conv2d followed by residual add
+
+    Argeuments of each submodule are not important because we only match types for a given node
+    """
+    def __init__(self,):
+        super().__init__()
+        self.drop = torch.nn.Identity()
+        self.act = torch.nn.Identity()
+        self.drop_path = torch.nn.Identity()
+
+    def forward(self, x, identity):
+        x = self.drop(x)
+        x = self.act(x)
+        x = self.drop_path(x)
+        x = x + identity
         return x
