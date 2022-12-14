@@ -99,7 +99,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
             model_traced.add_submodule(res_mul_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
                                                                                                calib_method=method)))
 
-            # The matched end node is Mul, whose args[0] we want to add quantizer to
+            # The matched end node is Mul, whose 1st input we want to add quantizer to
             fx_utils.add_quantizer(node, model_traced, (0,), (res_mul_quantizer_name,))
 
         elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, drop_act_drop_add_pattern.graph, drop_act_drop_add_pattern):
@@ -110,8 +110,8 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
             model_traced.add_submodule(res_add_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
                                                                                                calib_method=method)))
 
-            # The matched end node is Mul, whose args[0] we want to add quantizer to
-            fx_utils.add_quantizer(node, model_traced, (0,), (res_add_quantizer_name,))
+            # The matched end node is Add, whose snd input we want to add quantizer to
+            fx_utils.add_quantizer(node, model_traced, (1,), (res_add_quantizer_name,))
 
     for node in model_traced.graph.nodes:
         if node.target in _MODULES_QUANT_INPUT_AND_WEIGHTS:
