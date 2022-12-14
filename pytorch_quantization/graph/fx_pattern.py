@@ -26,16 +26,23 @@ class ConvBnResReluTypePattern(torch.nn.Module):
 
 "SESiLU Block of EfficientNet"
 class SESiLUTypePattern(torch.nn.Module):
-    def __init__(self,):
+    def __init__(self, lower_conv=False):
         super().__init__()
+        self.lower_conv = lower_conv
         self.conv_reduce = torch.nn.Conv2d(32, 8, 1)
         self.conv_expand = torch.nn.Conv2d(8,32, 1)
         self.act = torch.nn.SiLU(inplace=True)
         self.gate = torch.nn.Sigmoid()
 
     def forward(self, x, identity):
-        x = self.conv_reduce(x)
+        if not self.lower_conv:
+            x = self.conv_reduce(x)
+        else:
+            x = torch.nn.functional.conv2d(x, self.conv_reduce.weight)
         x = self.act(x)
-        x = self.conv_expand(x)
+        if not self.lower_conv:
+            x = self.conv_expand(x)
+        else:
+            x = torch.nn.functional.conv2d(x, self.conv_expand.weight)
         x = identity * self.gate(x)
         return x

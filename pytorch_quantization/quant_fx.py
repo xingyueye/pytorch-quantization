@@ -74,7 +74,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
         model_traced = fx.symbolic_trace(model)
 
     conv_bn_res_pattern = fx.symbolic_trace(ConvBnResReluTypePattern(lower_conv_linear))
-    se_silu_pattern = fx.symbolic_trace(SESiLUTypePattern())
+    se_silu_pattern = fx.symbolic_trace(SESiLUTypePattern(lower_conv_linear))
 
     for node in model_traced.graph.nodes:
         if node.target in _MODULES_QUANT_INPUT_AND_WEIGHTS:
