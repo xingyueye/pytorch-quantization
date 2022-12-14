@@ -4,7 +4,7 @@ from torch import fx
 from pytorch_quantization.nn import TensorQuantizer
 from pytorch_quantization.tensor_quant import QuantDescriptor
 from pytorch_quantization.graph import fx_utils
-from pytorch_quantization.graph.fx_pattern import ConvBnResReluTypePattern, SESiLUTypePattern
+from pytorch_quantization.graph.fx_pattern import ConvBnResReluTypePattern, ConvBnResTypePattern, SESiLUTypePattern
 
 _MODULES_QUANT_INPUT_AND_WEIGHTS = [
     nn.functional.conv2d,
@@ -73,8 +73,31 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
     else:
         model_traced = fx.symbolic_trace(model)
 
-    conv_bn_res_pattern = fx.symbolic_trace(ConvBnResReluTypePattern(lower_conv_linear))
+    conv_bn_res_relu_pattern = fx.symbolic_trace(ConvBnResReluTypePattern(lower_conv_linear))
+    conv_bn_res_pattern = fx.symbolic_trace(ConvBnResTypePattern(lower_conv_linear))
     se_silu_pattern = fx.symbolic_trace(SESiLUTypePattern(lower_conv_linear))
+
+    for node in model_traced.graph.nodes:
+        if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, conv_bn_res_pattern.graph, conv_bn_res_pattern):
+            # Add quantizer to one edge of the residual add
+            print('node: ', node, node.name)
+
+            res_add_quantizer_name = F"{'.'.join(node.name.split('.'))}.input_quantizer"
+            model_traced.add_submodule(res_add_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
+                                                                                               calib_method=method)))
+
+            # The matched end node is ReLU, whose args[0] is the add node we want to add quantizer to
+            fx_utils.add_quantizer(node, model_traced, (1,), (res_add_quantizer_name,))
+        elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, se_silu_pattern.graph, se_silu_pattern):
+            # Add quantizer to one edge of the residual mul
+            print('node: ', node, node.name)
+
+            res_mul_quantizer_name = F"{'.'.join(node.name.split('.'))}.input_quantizer"
+            model_traced.add_submodule(res_mul_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
+                                                                                               calib_method=method)))
+
+            # The matched end node is Mul, whose args[0] we want to add quantizer to
+            fx_utils.add_quantizer(node, model_traced, (0,), (res_mul_quantizer_name,))
 
     for node in model_traced.graph.nodes:
         if node.target in _MODULES_QUANT_INPUT_AND_WEIGHTS:
@@ -116,27 +139,27 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
                                                                                                calib_method=method)))
 
             fx_utils.add_quantizer(node, model_traced, (0,), (avgpool_quantizer_name,))
-
-        elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, conv_bn_res_pattern.graph, conv_bn_res_pattern):
-            # Add quantizer to one edge of the residual add
-            print('node: ', node, node.args[0].name)
-
-            res_add_quantizer_name = F"{'.'.join(node.args[0].name.split('.'))}.input_quantizer"
-            model_traced.add_submodule(res_add_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
-                                                                                               calib_method=method)))
-
-            # The matched end node is ReLU, whose args[0] is the add node we want to add quantizer to
-            fx_utils.add_quantizer(node.args[0], model_traced, (1,), (res_add_quantizer_name,))
-        elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, se_silu_pattern.graph, se_silu_pattern):
-            # Add quantizer to one edge of the residual mul
-            print('node: ', node, node.name)
-
-            res_mul_quantizer_name = F"{'.'.join(node.name.split('.'))}.input_quantizer"
-            model_traced.add_submodule(res_mul_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
-                                                                                               calib_method=method)))
-
-            # The matched end node is Mul, whose args[0] we want to add quantizer to
-            fx_utils.add_quantizer(node, model_traced, (0,), (res_mul_quantizer_name,))
+        #
+        # elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, conv_bn_res_relu_pattern.graph, conv_bn_res_relu_pattern):
+        #     # Add quantizer to one edge of the residual add
+        #     print('node: ', node, node.args[0].name)
+        #
+        #     res_add_quantizer_name = F"{'.'.join(node.args[0].name.split('.'))}.input_quantizer"
+        #     model_traced.add_submodule(res_add_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
+        #                                                                                        calib_method=method)))
+        #
+        #     # The matched end node is ReLU, whose args[0] is the add node we want to add quantizer to
+        #     fx_utils.add_quantizer(node.args[0], model_traced, (1,), (res_add_quantizer_name,))
+        # elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, se_silu_pattern.graph, se_silu_pattern):
+        #     # Add quantizer to one edge of the residual mul
+        #     print('node: ', node, node.name)
+        #
+        #     res_mul_quantizer_name = F"{'.'.join(node.name.split('.'))}.input_quantizer"
+        #     model_traced.add_submodule(res_mul_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
+        #                                                                                        calib_method=method)))
+        #
+        #     # The matched end node is Mul, whose args[0] we want to add quantizer to
+        #     fx_utils.add_quantizer(node, model_traced, (0,), (res_mul_quantizer_name,))
 
     model_traced.recompile()
     model_traced.graph.lint()
