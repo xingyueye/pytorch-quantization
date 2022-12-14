@@ -94,14 +94,20 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
 
         elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, se_silu_pattern.graph, se_silu_pattern):
             # Add quantizer to one edge of the residual mul
-            print('node: ', node, node.name)
+            print('node: ', node, node.name, node.args[1].name)
 
             res_mul_quantizer_name = F"{'.'.join(node.name.split('.'))}.input_quantizer"
             model_traced.add_submodule(res_mul_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
                                                                                                calib_method=method)))
-
             # The matched end node is Mul, whose 1st input we want to add quantizer to
             fx_utils.add_quantizer(node, model_traced, (0,), (res_mul_quantizer_name,))
+
+            # insert quantizer before sigmoid
+            sigmoid_quantizer_name = F"{'.'.join(node.args[1].name.split('.'))}.input_quantizer"
+            model_traced.add_submodule(sigmoid_quantizer_name, TensorQuantizer(QuantDescriptor(num_bits=num_bits,
+                                                                                               calib_method=method)))
+            # The matched end node is Mul, whose 1st input we want to add quantizer to
+            fx_utils.add_quantizer(node.args[1], model_traced, (0,), (sigmoid_quantizer_name,))
 
         elif fx_utils.end_node_a_matches_graph_b_types(node, model_traced, drop_act_drop_add_pattern.graph, drop_act_drop_add_pattern):
             # Add quantizer to one edge of the residual mul
