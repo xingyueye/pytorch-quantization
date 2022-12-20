@@ -303,31 +303,11 @@ parser.add_argument('--fuser', default='', type=str,
 parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
 
-# Calibration parameters
+# Quantization parameters
 parser.add_argument('--quant', action='store_true', default=False, help='Enable quantization')
-parser.add_argument('--use_lsq', action='store_true', default=False, help='Enable quantization')
-parser.add_argument('--lsq_type', type=str, default=None, help='Enable quantization')
-parser.add_argument('--bit-w', type=int, default=8, help='Quantization bits for weights')
-parser.add_argument('--bit-a', type=int, default=8, help='Quantization bits for activation')
 parser.add_argument('--calib', action='store_true', default=False, help='Enable calibration')
-parser.add_argument('--skip-layers', action='store_true', default=False, help='keep some layers full-precision')
-parser.add_argument('--freeze-layers', action='store_true', default=False, help='freeze some layers grad')
-parser.add_argument('--distill-type', type=str, default=None, choices=['cwd', 'frs', 'kd'], help='Distillation type')
-parser.add_argument('--use-adapter', action='store_true', default=False, help='Use adapter')
-parser.add_argument('--adapter-kernel', type=int, default=3, help='Kernel size of adapter conv')
-parser.add_argument('--adapter-chan', nargs="+", type=int, default=[64, 128, 256], help='Output channel of adapter conv')
-parser.add_argument('--adapter-pad', type=int, default=1, help='Padding of adapter conv')
+parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml', help='Output d irectory to save calibrated model')
 parser.add_argument('--pretrained_calib', type=str, default='', help='Pretrained model')
-parser.add_argument('--teacher-pretrained', type=str, default='./assets/yolov6s.pt', help='Pretrained teacher model')
-parser.add_argument('--num-bits', type=int, default=8, help='Quantization bit width')
-parser.add_argument('--calib-batches', type=int, default=4, help='Batches for calibration')
-parser.add_argument('--calib-method', type=str, default='histogram', choices=['max', 'histogram'],
-                    help='calibration method')
-parser.add_argument('--histogram-amax-method', type=str, default='entropy', choices=['entropy', 'percentile', 'mse'],
-                    help='Histogram amax method from [entropy, percentile, mse]')
-parser.add_argument('--histogram-amax-percentile', type=float, default=99.99,
-                    help='Histogram amax percentile, default=99.99')
-parser.add_argument('--calib-output-path', type=str, default='./', help='Output d irectory to save calibrated model')
 
 
 def _parse_args():
@@ -434,7 +414,7 @@ def main():
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
     if args.quant:
-        model, config = quant_model_init(model, config_file='./mpq_config.yaml', calib_weights=args.pretrained_calib)
+        model, config = quant_model_init(model, config_file=args.quant_config, calib_weights=args.pretrained_calib)
         # if args.use_lsq:
         #     init_func = lsq_plus_qat_init_model_manu if args.lsq_type=='lsq_plus' else lsq_qat_init_model_manu
         #     init_func(model, args.bit_w, args.bit_a, lsq_type=args.lsq_type)           # using lsq_qat
