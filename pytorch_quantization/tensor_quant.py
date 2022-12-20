@@ -105,7 +105,7 @@ class ScaledQuantDescriptor():
 
         # add learn_scale configs
         self._learn_scale_type = kwargs.pop('_learn_scale_type', 'naive')     # lsq / stable_lsq / lsq_plus / naive
-        self._learn_scale = False if self._learn_scale_type is None else True
+        self._learn_scale = False if self._learn_scale_type == 'naive' else True
 
         if kwargs:
             raise TypeError("Unused keys: {}".format(kwargs.keys()))
