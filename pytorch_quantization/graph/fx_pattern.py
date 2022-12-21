@@ -1,4 +1,6 @@
 import torch
+from pytorch_quantization import nn as quant_nn
+
 __all__ = ['ConvBnResReluTypePattern', 'SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern']
 
@@ -8,18 +10,14 @@ class ConvBnResReluTypePattern(torch.nn.Module):
 
     Argeuments of each submodule are not important because we only match types for a given node
     """
-    def __init__(self, lower_conv=False):
+    def __init__(self,):
         super().__init__()
-        self.lower_conv= lower_conv
-        self.conv = torch.nn.Conv2d(16, 32, 3)
+        self.conv = quant_nn.QuantConv2d(16, 32, 3)
         self.bn = torch.nn.BatchNorm2d(32)
         self.relu = torch.nn.ReLU(inplace=True)
 
     def forward(self, x, identity):
-        if not self.lower_conv:
-            x = self.conv(x)
-        else:
-            x = torch.nn.functional.conv2d(x, self.conv.weight)
+        x = self.conv(x)
         x = self.bn(x)
         x = x + identity
         x = self.relu(x)
@@ -27,24 +25,17 @@ class ConvBnResReluTypePattern(torch.nn.Module):
 
 """SESiLU Block of EfficientNet"""
 class SESiLUTypePattern(torch.nn.Module):
-    def __init__(self, lower_conv=False):
+    def __init__(self,):
         super().__init__()
-        self.lower_conv = lower_conv
-        self.conv_reduce = torch.nn.Conv2d(32, 8, 1)
-        self.conv_expand = torch.nn.Conv2d(8,32, 1)
+        self.conv_reduce = quant_nn.QuantConv2d(32, 8, 1)
+        self.conv_expand = quant_nn.QuantConv2d(8,32, 1)
         self.act = torch.nn.SiLU(inplace=True)
         self.gate = torch.nn.Sigmoid()
 
     def forward(self, x, identity):
-        if not self.lower_conv:
-            x = self.conv_reduce(x)
-        else:
-            x = torch.nn.functional.conv2d(x, self.conv_reduce.weight)
+        x = self.conv_reduce(x)
         x = self.act(x)
-        if not self.lower_conv:
-            x = self.conv_expand(x)
-        else:
-            x = torch.nn.functional.conv2d(x, self.conv_expand.weight)
+        x = self.conv_expand(x)
         x = identity * self.gate(x)
         return x
 

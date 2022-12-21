@@ -163,6 +163,23 @@ def compute_amax(model, **kwargs):
             print(F"{name:40}: {module}")
     model.cuda()
 
+
+def quant_config(args):
+    # initialize input quant policy
+    if args.method == 'max':
+        method = 'max'
+    else:
+        method = 'histogram'
+    quant_desc_input = QuantDescriptor(num_bits=args.num_bits, calib_method=method)
+    quant_nn.QuantConv2d.set_default_quant_desc_input(quant_desc_input)
+    quant_nn.QuantConvTranspose2d.set_default_quant_desc_input(quant_desc_input)
+    quant_nn.QuantLinear.set_default_quant_desc_input(quant_desc_input)
+    quant_nn.QuantAvgPool2d.set_default_quant_desc_input(quant_desc_input)
+    quant_nn.QuantAdaptiveAvgPool2d.set_default_quant_desc_input(quant_desc_input)
+    quant_nn.QuantMaxPool2d.set_default_quant_desc_input(quant_desc_input)
+    # weight default quant model is perchannel
+
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -384,6 +401,9 @@ def export_onnx(model, onnx_path, args, data_config):
 
 
 def main(args):
+    quant_modules.initialize()
+    quant_config(args)
+
     model = create_model(
         args.model,
         pretrained=args.pretrained,
