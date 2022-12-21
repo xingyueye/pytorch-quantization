@@ -15,7 +15,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
     # We use LowerQuantOpTracer
     model_traced = fx.GraphModule(model, fx_utils.LowerQuantOpTracer().trace(model))
     # Create QuantizerDescriptor
-    quantizer_desc = QuantDescriptor(num_bits=num_bits, calib_method=calib_method)
+    quantizer_desc = QuantDescriptor(num_bits=num_bits, calib_method=method)
     # Pattern match
     pattern_matchers = get_internal_pattern_matcher()
     for pattern_matcher in pattern_matchers:
