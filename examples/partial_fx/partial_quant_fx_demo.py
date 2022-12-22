@@ -45,6 +45,8 @@ parser.add_argument('-j', '--workers', default=6, type=int, metavar='N',
                     help='number of data loading workers (default: 2)')
 parser.add_argument('-b', '--batch-size', default=4, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
+parser.add_argument('--eval-batch-size', default=20, type=int,
+                    metavar='N', help='eval-batch size (default: 20)')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
                     help='use pre-trained model')
 parser.add_argument('--num-classes', type=int, default=None,
@@ -288,9 +290,9 @@ def sensitivity_analyse(model, loader, method, device=None):
         module_quant_enable(model, k)
         m = get_module(model, k)
         # If it's nn.Module, we use its child module
-        if isinstance(m, torch.nn.Module):
-            k = k + '._input_quantizer'
-            m = get_module(model, k)
+        children_modules = list(m.children())
+        if len(children_modules) == 1 and isinstance(children_modules[0], quant_nn.TensorQuantizer):
+            m = get_module(model, k + '._input_quantizer')
         sensitivity = GetLayerSensitivity(model, m, device)
         module_ori_output, module_quant_output = sensitivity(images, k)
 
@@ -452,7 +454,7 @@ def main(args):
     val_loader = create_loader(
         val_dataset,
         input_size=data_config['input_size'],
-        batch_size=args.batch_size,
+        batch_size=args.eval_batch_size,
         use_prefetcher=True,
         interpolation=data_config['interpolation'],
         mean=data_config['mean'],
@@ -471,7 +473,7 @@ def main(args):
     mini_loader = create_loader(
         mini_dataset,
         input_size=data_config['input_size'],
-        batch_size=args.batch_size,
+        batch_size=args.eval_batch_size,
         use_prefetcher=True,
         interpolation=data_config['interpolation'],
         mean=data_config['mean'],
