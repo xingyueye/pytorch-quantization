@@ -15,6 +15,8 @@ parser.add_argument('--workers', default=6, type=int, metavar='N',
                     help='number of data loading workers (default: 2)')
 parser.add_argument('--batch-size', default=4, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
+parser.add_argument('--eval-batch-size', default=20, type=int,
+                    metavar='N', help='eval-batch size (default: 20)')
 parser.add_argument('--output_path', default='./timm_pptq_fx', type=str,
                     help='path to save results')
 
@@ -77,6 +79,7 @@ def partial_quant(args):
                         '--split', args.split,
                         '--model', model_name,
                         '--batch-size', str(args.batch_size),
+                        '--eval-batch-size', str(args.eval_batch_size),
                         '--calib_num', str(args.calib_num),
                         '--method', args.method,
                         '--sensitivity_method', args.sensitivity_method,
