@@ -187,15 +187,27 @@ def compute_amax_mp(model, **kwargs):
     worker_list = list()
     interval = len(quantizer_list) // co_workers
     for i in range(co_workers):
-        start = i * interval
-        end = min((i + 1) * interval, len(quantizer_list))
-        worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start : end],), kwargs=kwargs)
+        start = i
+        end = co_workers * interval
+        worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start : end : interval],), kwargs=kwargs)
         worker_list.append(worker)
+    remain = len(quantizer_list) % co_workers
+    if remain > 0:
+        start = co_workers * interval
+        end = len(quantizer_list)
+        worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start: end],), kwargs=kwargs)
+        worker_list.append(worker)
+
     for worker in worker_list:
         worker.start()
     for worker in worker_list:
         worker.join()
     model.cuda()
+
+def print_amax(model):
+    for name, module in model.named_modules():
+        if isinstance(module, quant_nn.TensorQuantizer):
+            print(F"{name:40}: {module}")
 
 def quant_config(args):
     # initialize input quant policy
@@ -534,6 +546,7 @@ def main(args):
         with torch.no_grad():
             collect_stats(model, train_loader, args.calib_num)
             compute_amax_mp(model, method=args.method, percentile=args.percentile, calib_workers=args.calib_workers)
+            print_amax(model)
         torch.save(model.state_dict(), os.path.join(os.path.join(args.output, 'calib'), args.model + '_calib.pth'))
     else:
         model.load_state_dict(torch.load(args.calib_weight))
