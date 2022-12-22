@@ -16,10 +16,10 @@
 #
 
 
-from pytorch_quantization.nn.modules.tensor_quantizer import *
-from pytorch_quantization.nn.modules.tensor_lsq_quantizer import *
-from pytorch_quantization.nn.modules.tensor_stable_lsq_quantizer import *
-from pytorch_quantization.nn.modules.tensor_lsq_plus_quantizer import *
+from pytorch_quantization.nn.quantizer.tensor_quantizer import *
+from pytorch_quantization.nn.quantizer.tensor_lsq_quantizer import *
+from pytorch_quantization.nn.quantizer.tensor_stable_lsq_quantizer import *
+from pytorch_quantization.nn.quantizer.tensor_lsq_plus_quantizer import *
 
 from pytorch_quantization.nn.modules.quant_conv import *
 from pytorch_quantization.nn.modules.quant_linear import *

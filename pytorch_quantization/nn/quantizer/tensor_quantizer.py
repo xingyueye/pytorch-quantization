@@ -44,7 +44,8 @@ CALIB_METHOD_MAP={
     "histogram": calib.HistogramCalibrator,
     "asym_histogram": calib.AsymHistogramCalibrator,
     "max": calib.MaxCalibrator,
-    "minmax": calib.MinMaxCalibrator
+    "minmax": calib.MinMaxCalibrator,
+    "lsq": calib.LSQCalibrator
 }
 
 class TensorQuantizer(nn.Module):
@@ -393,7 +394,7 @@ class TensorQuantizer(nn.Module):
 
         return outputs
     
-    def init_learn_scale(self, inputs=None):
+    def init_qat_param(self, inputs=None):
         pass
 
     def _quant_forward(self, inputs):

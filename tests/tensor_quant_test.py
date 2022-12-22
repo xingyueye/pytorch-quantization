@@ -26,7 +26,7 @@ from torch.nn.parameter import Parameter
 from pytorch_quantization import calib
 from pytorch_quantization import cuda_ext
 from pytorch_quantization import tensor_quant
-from pytorch_quantization.nn.modules.tensor_quantizer import TensorQuantizer
+from pytorch_quantization.nn.quantizer.tensor_quantizer import TensorQuantizer
 
 import tests.utils as test_utils
 from tests.fixtures import verbose

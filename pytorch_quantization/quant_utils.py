@@ -90,13 +90,13 @@ def compute_amax(model, **kwargs):
             print(F"{name:40}: {module}")
     model.cuda()
 
-def lsq_init(model, quant_module_map=[]):
+def qat_init(model, quant_module_map=[]):
     for name, module in model.named_modules():
         if module.__class__.__name__ in _DEFAULT_DE_QUANT_MAP:
             if hasattr(module, "_input_quantizer"):
-                module._input_quantizer.init_learn_scale()
+                module._input_quantizer.init_qat_param()
             if hasattr(module, "_weight_quantizer"):
-                module._weight_quantizer.init_learn_scale(inputs=module.weight.data)
+                module._weight_quantizer.init_qat_param(inputs=module.weight.data)
 
 def set_module(model, submodule_key, module):
     tokens = submodule_key.split('.')
@@ -242,7 +242,7 @@ def quant_model_init(model, config_file, calib_weights=''):
         state_dict = torch.load(calib_weights, map_location='cpu')
         model.load_state_dict(state_dict['model'].state_dict())
         # model.load_state_dict(state_dict)
-        lsq_init(model, quant_module_map)  
+        qat_init(model, quant_module_map)
     return model, config
 
 def save_calib_model(model, config):

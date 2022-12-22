@@ -50,7 +50,7 @@ also some predefined ``QuantDescriptor``, e.g.
 .. code:: python
 
     from pytorch_quantization.tensor_quant import QuantDescriptor
-    from pytorch_quantization.nn.modules.tensor_quantizer import TensorQuantizer
+    from pytorch_quantization.nn.quantizer.tensor_quantizer import TensorQuantizer
 
     quant_desc = QuantDescriptor(num_bits=4, fake_quant=False, axis=(0), unsigned=True)
     quantizer = TensorQuantizer(quant_desc)

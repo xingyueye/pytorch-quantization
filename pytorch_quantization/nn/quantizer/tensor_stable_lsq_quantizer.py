@@ -27,12 +27,12 @@ from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, lsq
 from pytorch_quantization import calib
 
 import pytorch_quantization.utils as quant_utils
-from pytorch_quantization.nn import TensorQuantizer
+from pytorch_quantization.nn import LSQTensorQuantizer, TensorQuantizer
 from pytorch_quantization.nn.functional import GradScaleFunction
 
-__all__ = ['LSQTensorQuantizer']
+__all__ = ['StableLSQTensorQuantizer']
 
-class LSQTensorQuantizer(TensorQuantizer):
+class StableLSQTensorQuantizer(LSQTensorQuantizer):
     """Tensor quantizer module
 
     This module uses tensor_quant or fake_tensor_quant funßtion to quantize a tensor. And wrappers variable, moving
@@ -70,19 +70,7 @@ class LSQTensorQuantizer(TensorQuantizer):
 
     def __init__(self, quant_desc=QuantDescriptor(), disabled=False, if_quant=True, if_clip=False, if_calib=False):
         """Initialize quantizer and set up required variables"""
-        super(LSQTensorQuantizer, self).__init__(quant_desc, disabled, if_quant, if_clip, if_calib)
-
-        self._learn_scale = quant_desc._learn_scale
-        self._learn_scale_type = quant_desc._learn_scale_type
-        assert quant_desc._learn_scale, "LSQ series Quantizer need the learnable scale!"
-        self._learn_scale_init = False
-        self.scale_for_grad = None
-
-    @property
-    def scale(self):
-        if self._scale is None:
-            logging.critical("Accessing scale before quantizing any tensor!")
-        return self._scale
+        super(StableLSQTensorQuantizer, self).__init__(quant_desc, disabled, if_quant, if_clip, if_calib)
 
     # pylint:enable=missing-docstring
     def load_calib_amax(self, *args, **kwargs):
@@ -95,10 +83,7 @@ class LSQTensorQuantizer(TensorQuantizer):
         strict = kwargs.pop("strict", True)
         if getattr(self, '_calibrator', None) is None:
             raise RuntimeError("Calibrator not created.")
-        if self._learn_scale and self._learn_scale_type == 'lsq':
-            calib_amax = self._calibrator.compute_amax_lsq()
-        else:
-            raise "Unsupported amax computing method for LSQ Quantizer!"
+        calib_amax = self._calibrator.compute_amax(*args, **kwargs)
 
         if calib_amax is None:
             err_msg = "Calibrator returned None. This usually happens when calibrator hasn't seen any tensor."
@@ -117,22 +102,11 @@ class LSQTensorQuantizer(TensorQuantizer):
             self._amax.copy_(calib_amax)
 
     def _param_init(self, inputs=None):
-        init_weight = self._amax
-        value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
-        epsilon = 1. / (1 << 24)
-        if value.min() <= epsilon:
-            zero_amax_mask = (value <= epsilon)
-            value.data[zero_amax_mask] = 1.
-
+        qmax = 2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0
+        value = torch.nn.Parameter((self._amax / qmax) ** 0.5, requires_grad=True)
         if hasattr(self, '_scale'):
-            self._scale.data = value.data
-        else:
-            self.register_parameter('_scale', value)
-
-    def init_learn_scale(self, inputs=None):
-        """Initialize learned scale from PTQ amax or lsq_init"""
-        self._param_init(inputs)
-        self._learn_scale_init = True  
+            del self._scale
+        self.register_parameter('_scale', value)
 
     def _quant_forward(self, inputs):
         """Quantized forward pass."""
@@ -140,11 +114,10 @@ class LSQTensorQuantizer(TensorQuantizer):
             numel = inputs.numel()
             self.max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=inputs.device)
             self.scale_for_grad = torch.tensor(1.0 / ((self.max_bound * numel) ** 0.5), device=inputs.device)
-        
         if not self._learn_scale_init:
-            self.init_learn_scale(inputs)
-
-        _scale = GradScaleFunction.apply(self._scale, self.scale_for_grad)
+            self.init_qat_param(inputs)
+        step_size = self._scale ** 2
+        _scale = GradScaleFunction.apply(step_size, self.scale_for_grad)
         amax = _scale * self.max_bound
 
         if self._fake_quant:
@@ -156,8 +129,6 @@ class LSQTensorQuantizer(TensorQuantizer):
                 outputs = self._fb_fake_quant(inputs, amax)
         else:
             outputs, self._scale = tensor_quant(inputs, amax, self._num_bits, self._unsigned)
-        # print(outputs)
-        # print((inputs-outputs).max())
 
         return outputs
 
@@ -178,7 +149,7 @@ class LSQTensorQuantizer(TensorQuantizer):
         if self._if_calib:
             if self._calibrator is None:
                 raise RuntimeError("Calibrator was not created.")
-            self._calibrator.lsq_collect(inputs)
+            self._calibrator.collect(inputs)
 
         if self._if_quant:
             outputs = self._quant_forward(inputs)

@@ -131,7 +131,7 @@ class LSQPlusTensorQuantizer(LSQTensorQuantizer):
             self.scale_for_grad = torch.tensor(1.0 / ((self.max_bound * numel) ** 0.5), device=inputs.device)
 
         if not self._learn_scale_init:
-            self.init_learn_scale(inputs)
+            self.init_qat_param(inputs)
 
         _scale = GradScaleFunction.apply(self._scale, self.scale_for_grad)
         amax = _scale * self.max_bound
@@ -168,7 +168,7 @@ class LSQPlusTensorQuantizer(LSQTensorQuantizer):
         if self._if_calib:
             if self._calibrator is None:
                 raise RuntimeError("Calibrator was not created.")
-            self._calibrator.lsq_collect(inputs)
+            self._calibrator.collect(inputs)
 
         if self._if_quant:
             outputs = self._quant_forward(inputs)

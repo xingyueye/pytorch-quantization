@@ -27,7 +27,7 @@ from torch import nn
 from pytorch_quantization import calib
 from pytorch_quantization import tensor_quant
 from pytorch_quantization import nn as quant_nn
-from pytorch_quantization.nn.modules.tensor_quantizer import TensorQuantizer
+from pytorch_quantization.nn.quantizer.tensor_quantizer import TensorQuantizer
 
 # pylint:disable=missing-docstring, no-self-use
 

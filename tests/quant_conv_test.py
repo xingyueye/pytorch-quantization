@@ -29,7 +29,7 @@ import torch.nn.functional as F
 
 from pytorch_quantization import tensor_quant
 from pytorch_quantization.tensor_quant import QuantDescriptor
-from pytorch_quantization.nn.modules.tensor_quantizer import TensorQuantizer
+from pytorch_quantization.nn.quantizer.tensor_quantizer import TensorQuantizer
 from pytorch_quantization import utils as quant_utils
 from pytorch_quantization.nn.modules import quant_conv
 import tests.utils as test_utils

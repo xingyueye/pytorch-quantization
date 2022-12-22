@@ -38,7 +38,7 @@ from timm.optim import create_optimizer_v2, optimizer_kwargs
 from timm.scheduler import create_scheduler
 from timm.utils import ApexScaler, NativeScaler
 
-from pytorch_quantization.quant_utils import quant_model_init, quant_model_calib, quant_model_export
+from pytorch_quantization.quant_utils import quant_model_init, quant_model_calib_timm, quant_model_export
 
 try:
     from apex import amp
@@ -630,7 +630,7 @@ def main():
     validate_loss_fn = nn.CrossEntropyLoss().cuda()
 
     if args.calib:
-        ptq_calibrate(model, args, loader_train)
+        quant_model_calib_timm(model, loader_train, config)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
         return
 
