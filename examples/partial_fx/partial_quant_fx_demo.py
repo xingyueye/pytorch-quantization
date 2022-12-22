@@ -370,6 +370,10 @@ def partial_quant(sensitivity_list, model, loader, acc1, ptq_acc1, drop, per_lay
             break
         module_quant_disable(model, layer_name)
         partial = validate_model(loader, model)
+        if partial < partial_acc1:
+            print("! Acc drop after quantization disable, fallback")
+            module_quant_enable(model, layer_name)
+            continue
         '''
         if partial - partial_acc1 < per_layer_drop:
             # tiny effect, skip
