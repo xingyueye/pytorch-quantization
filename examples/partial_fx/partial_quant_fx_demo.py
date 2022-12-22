@@ -189,7 +189,7 @@ def compute_amax_mp(model, **kwargs):
     for i in range(co_workers):
         start = i
         end = co_workers * interval
-        worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start : end : interval],), kwargs=kwargs)
+        worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start : end : co_workers],), kwargs=kwargs)
         worker_list.append(worker)
     remain = len(quantizer_list) % co_workers
     if remain > 0:
@@ -545,8 +545,7 @@ def main(args):
     if args.calib_weight is None:
         with torch.no_grad():
             collect_stats(model, train_loader, args.calib_num)
-            compute_amax_mp(model, method=args.method, percentile=args.percentile, calib_workers=args.calib_workers)
-            print_amax(model)
+            compute_amax(model, method=args.method, percentile=args.percentile)
         torch.save(model.state_dict(), os.path.join(os.path.join(args.output, 'calib'), args.model + '_calib.pth'))
     else:
         model.load_state_dict(torch.load(args.calib_weight))
