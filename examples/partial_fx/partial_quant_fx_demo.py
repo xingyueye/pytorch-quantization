@@ -190,7 +190,7 @@ def compute_amax_mp(model, **kwargs):
     for i in range(co_workers):
         start = i * interval
         end = min((i + 1) * interval, len(quantizer_list))
-        worker = Process(_load_calib_amax_mp, args=(quantizer_list[start, end], kwargs))
+        worker = Process(_load_calib_amax_mp, args=(quantizer_list[start : end], kwargs))
         worker_list.append(worker)
     for worker in worker_list:
         worker.start()
