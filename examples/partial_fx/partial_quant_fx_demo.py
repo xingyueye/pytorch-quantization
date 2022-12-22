@@ -267,7 +267,7 @@ def quantable_layers_gather(model):
     quantable_layers = []
     for name, module in model.named_modules():
         if name.endswith("_quantizer"):
-            layer_name = name.replace(".input_quantizer", "").replace(".weight_quantizer", "")
+            layer_name = name.replace("._input_quantizer", "").replace("._weight_quantizer", "")
             if layer_name not in quantable_layers:
                 quantable_layers.append(layer_name)
     return quantable_layers
@@ -287,6 +287,10 @@ def sensitivity_analyse(model, loader, method, device=None):
     for k in quantable_layers:
         module_quant_enable(model, k)
         m = get_module(model, k)
+        # If it's nn.Module, we use its child module
+        if isinstance(m, torch.nn.Module):
+            k = k + '._input_quantizer'
+            m = get_module(model, k)
         sensitivity = GetLayerSensitivity(model, m, device)
         module_ori_output, module_quant_output = sensitivity(images, k)
 
