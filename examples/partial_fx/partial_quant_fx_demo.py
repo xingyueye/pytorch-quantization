@@ -12,6 +12,7 @@ from collections import OrderedDict
 from contextlib import suppress
 from thop import profile
 from tqdm import tqdm
+from multiprocessing import Process
 
 from timm.models import create_model, apply_test_time_pool, load_checkpoint, is_model, list_models
 from timm.data import create_dataset, create_loader, resolve_data_config, RealLabelsImagenet
@@ -70,6 +71,8 @@ parser.add_argument('--calib_num', type=int, default=32,
                     help='calibration batch number')
 parser.add_argument('--calib_weight', type=str, default=None,
                     help='calibration weight')
+parser.add_argument('--calib_workers', type=int, default=10,
+                    help='multi-threads number to collect amax of quantizers')
 parser.add_argument('--skip_layers_num', type=int, default=0,
                     help='number of layers to be skipped')
 parser.add_argument('--skip_layers', nargs='+', default=[],
@@ -165,6 +168,35 @@ def compute_amax(model, **kwargs):
             print(F"{name:40}: {module}")
     model.cuda()
 
+def _load_calib_amax_mp(quantizer_list, **kwargs):
+    for name, quantizer in quantizer_list:
+        print(name)
+        if quantizer._calibrator is not None:
+            if isinstance(quantizer._calibrator, calib.MaxCalibrator):
+                quantizer.load_calib_amax()
+            else:
+                quantizer.load_calib_amax(**kwargs)
+
+def compute_amax_mp(model, **kwargs):
+    # collect Quantizer
+    quantizer_list = list()
+    for name, module in model.named_modules():
+        if isinstance(module, quant_nn.TensorQuantizer):
+            quantizer_list.append((name, module))
+    print("Total Quantizers {}".format(len(quantizer_list)))
+    co_workers = kwargs.pop('calib_workers', 10)
+    worker_list = list()
+    interval = len(quantizer_list) // co_workers
+    for i in range(co_workers):
+        start = i * interval
+        end = min((i + 1) * interval, len(quantizer_list))
+        worker = Process(_load_calib_amax_mp, args=(quantizer_list[start, end], kwargs))
+        worker_list.append(worker)
+    for worker in worker_list:
+        worker.start()
+    for worker in worker_list:
+        worker.join()
+    model.cuda()
 
 def quant_config(args):
     # initialize input quant policy
@@ -322,6 +354,7 @@ def partial_quant(sensitivity_list, model, loader, acc1, ptq_acc1, drop, per_lay
     total_layers = len(sensitivity_list)
     count = 0
     for layer_name, sensitivity in sensitivity_list:
+        print("Disable quantization of layer {}".format(layer_name))
         if acc1 - partial_acc1 < drop or count >= int(0.1 * total_layers):
             break
         module_quant_disable(model, layer_name)
@@ -501,7 +534,7 @@ def main(args):
     if args.calib_weight is None:
         with torch.no_grad():
             collect_stats(model, train_loader, args.calib_num)
-            compute_amax(model, method=args.method, percentile=args.percentile)
+            compute_amax_mp(model, method=args.method, percentile=args.percentile, calib_workers=args.calib_workers)
         torch.save(model.state_dict(), os.path.join(os.path.join(args.output, 'calib'), args.model + '_calib.pth'))
     else:
         model.load_state_dict(torch.load(args.calib_weight))
