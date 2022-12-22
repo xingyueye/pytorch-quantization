@@ -170,7 +170,6 @@ def compute_amax(model, **kwargs):
 
 def _load_calib_amax_mp(quantizer_list, **kwargs):
     for name, quantizer in quantizer_list:
-        print(name)
         if quantizer._calibrator is not None:
             if isinstance(quantizer._calibrator, calib.MaxCalibrator):
                 quantizer.load_calib_amax()
@@ -190,7 +189,7 @@ def compute_amax_mp(model, **kwargs):
     for i in range(co_workers):
         start = i * interval
         end = min((i + 1) * interval, len(quantizer_list))
-        worker = Process(_load_calib_amax_mp, args=(quantizer_list[start : end], kwargs))
+        worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start : end],), kwargs=kwargs)
         worker_list.append(worker)
     for worker in worker_list:
         worker.start()
