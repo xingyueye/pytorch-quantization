@@ -83,8 +83,8 @@ class QuantMixin():
                      if not quant_desc_weight.fake_quant else "fake ",
                      quant_desc_weight.num_bits, self.__class__.__name__, quant_desc_weight.axis)
 
-        input_tensor_quantizer = TENSOR_QUANTIZER_MAP[quant_desc_input.learn_scale_type]
-        weight_tensor_quantizer = TENSOR_QUANTIZER_MAP[quant_desc_weight.learn_scale_type]
+        input_tensor_quantizer = TENSOR_QUANTIZER_MAP[quant_desc_input.quantizer_type]
+        weight_tensor_quantizer = TENSOR_QUANTIZER_MAP[quant_desc_weight.quantizer_type]
         if num_layers is None:
             self._input_quantizer = input_tensor_quantizer(quant_desc_input)
             self._weight_quantizer = weight_tensor_quantizer(quant_desc_weight)
