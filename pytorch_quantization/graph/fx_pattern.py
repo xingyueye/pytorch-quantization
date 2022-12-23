@@ -1,7 +1,7 @@
 import torch
 from pytorch_quantization import nn as quant_nn
 
-__all__ = ['ConvBnResReluTypePattern', 'SESiLUTypePattern', 'DropActDropPathAddTypePattern',
+__all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern']
 
 """For residual add block of resnet"""
@@ -21,6 +21,28 @@ class ConvBnResReluTypePattern(torch.nn.Module):
         x = self.bn(x)
         x = x + identity
         x = self.relu(x)
+        return x
+
+"""For SEReLU of resnetrs"""
+class SEReLUTypePattern(torch.nn.Module):
+    """Create a pattern of conv2d followed by residual add
+
+    Argeuments of each submodule are not important because we only match types for a given node
+    """
+    def __init__(self,):
+        super().__init__()
+        self.squeeze = quant_nn.QuantConv2d(32, 8, 1)
+        self.expand = quant_nn.QuantConv2d(8,32, 1)
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.ident = torch.nn.Identity()
+
+    def forward(self, x, identity, identity2):
+        x = self.squeeze(x)
+        x = self.ident(x)
+        x = self.relu(x)
+        x = self.expand(x)
+        x = identity * x.sigmoid()
+        x = x + identity2
         return x
 
 """SESiLU Block of EfficientNet"""
