@@ -114,32 +114,8 @@ class TensorQuantizer(nn.Module):
         if if_clip:
             self.enable_clip()
 
-        # self._learn_scale = quant_desc._learn_scale
-        # if self._learn_scale:
-        #     self._learn_scale_init = False
-        #     self._learn_scale_type = quant_desc._learn_scale_type
-        #     # self.grad_scale = GradScale(self._num_bits, self._unsigned, use_sqrt=True if self._learn_scale_type == 'stable_lsq' else False)
-        #     if quant_desc._learn_scale_type == 'lsq_plus':
-        #         self.register_buffer('_amin', torch.tensor(0.0))
-        #         self._unsigned = True
-        #     self.fake_quant_func = FAKE_QUANT_FUNC_MAP[self._learn_scale_type](self.num_bits, self.unsigned, self.narrow_range)
-
         self._calibrator = CALIB_METHOD_MAP[quant_desc.calib_method](
                 num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
-        # if quant_desc.calib_method == "histogram":
-        #     logging.info("Creating histogram calibrator")
-        #     self._calibrator = calib.HistogramCalibrator(
-        #         num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
-        # if quant_desc.calib_method == "asym_histogram":
-        #     logging.info("Creating histogram calibrator")
-        #     self._calibrator = calib.AsymHistogramCalibrator(
-        #         num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
-        # elif quant_desc.calib_method == "max":
-        #     logging.info("Creating Max calibrator")
-        #     self._calibrator = calib.MaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
-        # elif quant_desc.calib_method == "minmax":
-        #     logging.info("Creating MinMax calibrator")
-        #     self._calibrator = calib.MinMaxCalibrator(num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
 
     # pylint:disable=missing-docstring
     @property
@@ -149,14 +125,6 @@ class TensorQuantizer(nn.Module):
     @property
     def unsigned(self):
         return self._unsigned
-
-    # @property
-    # def scale(self):
-    #     if self._fake_quant and (not self._learn_scale):
-    #         logging.error("Fake quantize mode doesn't use scale explicitly!")
-    #     if self._scale is None:
-    #         logging.critical("Accessing scale before quantizing any tensor!")
-    #     return self._scale
 
     @property
     def amax(self):
@@ -261,15 +229,9 @@ class TensorQuantizer(nn.Module):
         strict = kwargs.pop("strict", True)
         if getattr(self, '_calibrator', None) is None:
             raise RuntimeError("Calibrator not created.")
-        # if self._learn_scale and self._learn_scale_type == 'lsq':
-        #     calib_amax = self._calibrator.compute_amax_lsq()
-        # elif self._learn_scale and self._learn_scale_type == 'lsq_plus':
-        #     calib_amax, calib_amin = self._calibrator.compute_amax(*args, **kwargs)
-        # else:
-        #     calib_amax = self._calibrator.compute_amax(*args, **kwargs)
+
         calib_amax = self._calibrator.compute_amax(*args, **kwargs)
-        # if isinstance(calib_amax, tuple):
-        #     calib_amax, calib_amin = calib_amax
+
         if calib_amax is None:
             err_msg = "Calibrator returned None. This usually happens when calibrator hasn't seen any tensor."
             if not strict:
@@ -286,12 +248,6 @@ class TensorQuantizer(nn.Module):
         else:
             self._amax.copy_(calib_amax)
 
-        # if self._learn_scale and self._learn_scale_type == 'lsq_plus':
-        #     if not hasattr(self, '_amin'):
-        #         self.register_buffer('_amin', calib_amin.data)
-        #     else:
-        #         self._amin.copy_(calib_amin)
-
     def init_learn_amax(self):
         """Initialize learned amax from fixed amax"""
         if self._learn_amax is False:
@@ -304,54 +260,6 @@ class TensorQuantizer(nn.Module):
             init_amax = self._amax
         self.clip.clip_value_min.data.copy_(-init_amax.data)
         self.clip.clip_value_max.data.copy_(init_amax.data)
-
-    # def _lsq_init(self, inputs=None):
-    #     init_weight = self._amax
-    #     value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
-    #     epsilon = 1. / (1 << 24)
-    #     if value.min() <= epsilon:
-    #         zero_amax_mask = (value <= epsilon)
-    #         value.data[zero_amax_mask] = 1.
-
-    #     if hasattr(self, '_scale'):
-    #         self._scale.data = value.data
-    #     else:
-    #         self.register_parameter('_scale', value)
-
-    # def _ptq_init(self):
-    #     qmax = 2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0
-    #     value = torch.nn.Parameter((self._amax / qmax) ** 0.5, requires_grad=True)
-    #     if hasattr(self, '_scale'):
-    #         del self._scale
-    #     self.register_parameter('_scale', value)
-
-    # def _lsq_plus_init(self):
-    #     range = self._amax - self._amin
-    #     qmax = 2.0**(self._num_bits) - 1.0
-    #     scale = torch.nn.Parameter(range / qmax, requires_grad=True)
-    #     if hasattr(self, '_scale'):
-    #         del self._scale
-    #     self.register_parameter('_scale', scale)
-
-    #     offset = torch.nn.Parameter(self._amin, requires_grad=True)
-    #     if hasattr(self, '_offset'):
-    #         del self._offset
-    #     self.register_parameter('_offset', offset)
-
-    # def init_learn_scale(self, inputs=None):
-    #     """Initialize learned scale from PTQ amax or lsq_init"""
-    #     if self._learn_scale_type == 'lsq':
-    #         self._lsq_init(inputs)
-    #         self._learn_scale_init = True  
-    #     elif self._learn_scale_type == 'stable_lsq':
-    #         self._ptq_init()
-    #         self._learn_scale_init = True
-    #     elif self._learn_scale_type == 'lsq_plus':
-    #         self._lsq_plus_init()
-    #         self._learn_scale_init = True
-    #     else:
-    #         raise TypeError("Learned-step quantization doesn't support init_type of {}".format(self._learn_scale_type))
-    #     # logging.info("Quant_tensor learning_scale init with {}".format(self._learn_scale_type))
 
     def _get_amax(self, inputs):
         """get amax from buffer or compute it dynamically."""
@@ -416,47 +324,6 @@ class TensorQuantizer(nn.Module):
             outputs, self._scale = tensor_quant(inputs, amax, self._num_bits, self._unsigned)
 
         return outputs
-    
-    # def _quant_forward(self, inputs):
-    #     """Quantized forward pass."""
-    #     if self._learn_amax:
-    #         inputs = self.clip(inputs)
-    #         amax = torch.max(-self.clip.clip_value_min, self.clip.clip_value_max).detach()
-    #     elif self._learn_scale:
-    #         if not self._learn_scale_init:
-    #             self.init_learn_scale(inputs)
-    #             self._learn_scale_init=True
-    #         # scale, self._amax = self.grad_scale(inputs, self._scale)
-    #         amax = self._amax
-    #     else:
-    #         amax = self._get_amax(inputs)
-
-    #     if self._fake_quant:
-    #         if not TensorQuantizer.use_fb_fake_quant:
-    #             kwargs = {'amax': amax,
-    #             'scale':self._scale if hasattr(self, '_scale') else None, 
-    #             'offset':self._offset if hasattr(self, '_offset') else None}
-    #             outputs = self.fake_quant_func(inputs, **kwargs)
-    #             # if self._learn_scale:
-    #             #     if self._learn_scale_type == 'lsq':
-    #             #         outputs = lsq_fake_tensor_quant(inputs, self._scale, self._num_bits, self._unsigned, self._narrow_range, self.grad_scale)
-    #             #     elif self._learn_scale_type == 'stable_lsq':
-    #             #         scale = self._scale ** 2
-    #             #         outputs = lsq_fake_tensor_quant(inputs, scale, self._num_bits, self._unsigned, self._narrow_range)
-    #             #     elif self._learn_scale_type == 'lsq_plus':
-    #             #         outputs = lsq_plus_fake_tensor_quant(inputs, self._scale, self._offset, self.min_bound, self.max_bound, self.grad_scale)
-    #             # else:
-    #             #     outputs = fake_tensor_quant(inputs, amax, self._num_bits, self._unsigned, self._narrow_range)
-    #         else:
-    #             if inputs.dtype == torch.half or amax.dtype == torch.half:
-    #                 raise Exception("Exporting to ONNX in fp16 is not supported. Please export in fp32, i.e. disable AMP.")
-    #             outputs = self._fb_fake_quant(inputs, amax)
-    #     else:
-    #         outputs, self._scale = tensor_quant(inputs, amax, self._num_bits, self._unsigned)
-    #     # print(outputs)
-    #     # print((inputs-outputs).max())
-
-    #     return outputs
 
     def forward(self, inputs):
         """Apply tensor_quant function to inputs
@@ -485,42 +352,6 @@ class TensorQuantizer(nn.Module):
             outputs = self._quant_forward(inputs)
 
         return outputs
-
-
-    # def forward(self, inputs):
-    #     """Apply tensor_quant function to inputs
-
-    #     Args:
-    #         inputs: A Tensor of type float32.
-
-    #     Returns:
-    #         outputs: A Tensor of type output_dtype
-    #     """
-    #     if self._disabled:
-    #         return inputs
-
-    #     outputs = inputs
-
-    #     if self._if_calib:
-    #         if self._calibrator is None:
-    #             raise RuntimeError("Calibrator was not created.")
-    #         # Shape is only know when it sees the first tensor
-    #         if self._learn_scale and self._learn_scale_type == 'lsq':
-    #             self._calibrator.lsq_collect(inputs)
-    #         # if self._learn_scale and self._learn_scale_type == 'lsq_plus':
-    #         #     self._calibrator.collect(inputs)
-    #         else:
-    #             self._calibrator.collect(inputs)
-
-    #     if self._if_clip:
-    #         if not self._learn_amax:
-    #             raise RuntimeError("Clip without learning amax is not implemented.")
-    #         outputs = self.clip(inputs)
-
-    #     if self._if_quant:
-    #         outputs = self._quant_forward(inputs)
-
-    #     return outputs
 
     def _short_amax(self, fmt='.4f'):
         """Short description of amax

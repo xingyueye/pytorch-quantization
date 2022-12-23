@@ -140,11 +140,11 @@ def model_quant_enable(model):
 def get_quant_desc(config):
     quant_desc = {
         "input_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,
-                                                 _learn_scale_type=config.a_qscheme.quantizer_type),
+                                                 quantizer_type=config.a_qscheme.quantizer_type),
         "conv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(0), calib_method=config.w_qscheme.calib_method,
-                                                  _learn_scale_type=config.w_qscheme.quantizer_type),
+                                                  quantizer_type=config.w_qscheme.quantizer_type),
         "deconv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(1), calib_method=config.w_qscheme.calib_method,
-                                                  _learn_scale_type=config.w_qscheme.quantizer_type),                                                                     
+                                                  quantizer_type=config.w_qscheme.quantizer_type),                                                                     
     }
     return EasyDict(quant_desc)
 
@@ -247,13 +247,8 @@ def quant_model_init(model, config_file, calib_weights=''):
 
 def save_calib_model(model, config):
     # Save calibrated checkpoint
-    # import os
-    # output_model_path = os.path.join(config.calib_output_path, '{}_lsq_calib.pt'.
-    #                                     format(args.model))
-    output_model_path = "calib_{}.pt".format(config.calib_data_nums)                                    
+    output_model_path = "calib_{}_w{}a{}_{}.pt".format(config.calib_data_nums, config.w_qscheme.bit, config.a_qscheme.bit, config.a_qscheme.quantizer_type)                                    
     print('Saving calibrated model to {}... '.format(output_model_path))
-    # if not os.path.exists(args.calib_output_path):
-    #     os.mkdir(args.calib_output_path)
     torch.save({'model': model}, output_model_path)
 
 def quant_model_calib_timm(model, data_loader, config):
@@ -270,7 +265,6 @@ def quant_model_calib_timm(model, data_loader, config):
 
 def quant_model_export(model, onnx_path, data_shape):
     quant_nn.TensorQuantizer.use_fb_fake_quant = True
-    # data_shape = (args.batch_size,) + data_config['input_size']
     imgs = torch.randn(data_shape).cuda()
     torch.onnx.export(model, imgs, onnx_path,
                         input_names=['input'],
@@ -279,4 +273,4 @@ def quant_model_export(model, onnx_path, data_shape):
                         opset_version=13,
                         operator_export_type=torch.onnx.OperatorExportTypes.ONNX)
 
-    get_remove_qdq_onnx_and_cache(onnx_path)
+    get_refine_qat_models(onnx_path)
