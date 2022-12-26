@@ -154,7 +154,7 @@ if __name__ == '__main__':
             kwargs['calib_batch_size'] = args.calib_batch_size
             kwargs['calib_algo'] = args.calib_algo
             kwargs['calib_dataset'] = calibset
-            kwargs['calib_file'] = os.path.join(trt_int8_epath, model_name + '_calibration.cache')
+            kwargs['calib_file'] = ''
             kwargs['io_format'] = args.io_format
             kwargs['io_datatype'] = args.io_datatype
             trt_int8_engine = os.path.join(trt_int8_epath, model_name + '_int8.trt')
@@ -174,6 +174,7 @@ if __name__ == '__main__':
             # build int8 trt engine optimized by fx
             kwargs = dict()
             kwargs['precision'] = 'int8'
+            kwargs['quantized'] = True
             kwargs['io_format'] = args.io_format
             kwargs['io_datatype'] = args.io_datatype
             trt_int8_fx_engine = os.path.join(trt_int8_fx_epath, model_name + suffix + '_int8_fx.trt')
