@@ -154,7 +154,7 @@ if __name__ == '__main__':
             kwargs['calib_batch_size'] = args.calib_batch_size
             kwargs['calib_algo'] = args.calib_algo
             kwargs['calib_dataset'] = calibset
-            kwargs['calib_file'] = ''
+            kwargs['calib_file'] = os.path.join(trt_int8_epath, model_name + '_calibration.cache')
             kwargs['io_format'] = args.io_format
             kwargs['io_datatype'] = args.io_datatype
             trt_int8_engine = os.path.join(trt_int8_epath, model_name + '_int8.trt')

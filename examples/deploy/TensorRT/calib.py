@@ -62,6 +62,8 @@ class EngineCalibrator(trt.IInt8Calibrator):
         if os.path.exists(self.calib_file):
             with open(self.calib_file, "rb") as f:
                 return f.read()
+        else:
+            return None
 
     def write_calibration_cache(self, cache):
         with open(self.calib_file, "wb") as f:
