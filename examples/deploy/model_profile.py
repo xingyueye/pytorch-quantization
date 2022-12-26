@@ -9,12 +9,14 @@ from TensorRT.eval import Evaluator
 from onnx_utils import onnx_remove_qdqnode, save_calib_cache_file
 
 
-def prepare_env(model_zoo_path):
+def prepare_env(args):
+    model_zoo_path = args.model_zoo_path
+    sensitivity = args.sensitivity_method
     onnx_path = os.path.join(model_zoo_path, 'onnx')
     onnx_rmqdq_path = os.path.join(model_zoo_path, 'onnx_rmqdq')
     cache_rmqdq_path = os.path.join(model_zoo_path, 'cache_rmqdq')
     prep_path = os.path.join(model_zoo_path, 'prep')
-    model_file = os.path.join(model_zoo_path, 'partial_quant_collection_mse.txt')
+    model_file = os.path.join(model_zoo_path, 'partial_quant_collection_{}.txt'.format(sensitivity))
     profile_file = os.path.join(model_zoo_path, 'partial_quant_profile.txt')
 
     if not os.path.exists(onnx_rmqdq_path):
@@ -31,13 +33,13 @@ def prepare_env(model_zoo_path):
     if not os.path.exists(trt_int8_engine_path):
         print("Create {}".format(trt_int8_engine_path))
         os.makedirs(trt_int8_engine_path)
-    trt_int8_rmqdq_engine_path = os.path.join(model_zoo_path, 'trt_int8_rmqdq')
-    if not os.path.exists(trt_int8_rmqdq_engine_path):
-        print("Create {}".format(trt_int8_rmqdq_engine_path))
-        os.makedirs(trt_int8_rmqdq_engine_path)
+    trt_int8_fx_engine_path = os.path.join(model_zoo_path, 'trt_int8_fx')
+    if not os.path.exists(trt_int8_fx_engine_path):
+        print("Create {}".format(trt_int8_fx_engine_path))
+        os.makedirs(trt_int8_fx_engine_path)
 
     return model_file, onnx_path, onnx_rmqdq_path, cache_rmqdq_path, \
-           prep_path, trt_fp16_engine_path, trt_int8_engine_path, trt_int8_rmqdq_engine_path, profile_file
+           prep_path, trt_fp16_engine_path, trt_int8_engine_path, trt_int8_fx_engine_path, profile_file
 
 
 
@@ -65,13 +67,14 @@ if __name__ == '__main__':
     parser.add_argument('--io_datatype', default='fp32', type=str, choices=['fp16', 'fp32'])
     parser.add_argument('--graph_dump', default=False, action='store_true',
                         help='dump engine graph to json file')
+    parser.add_argument('--sensitivity_method', default='top1', type=str, choices=['top1', 'mse', 'snr', 'cosine'])
     args = parser.parse_args()
     print(args)
 
     assert os.path.exists(args.model_zoo_path), "model_zoo_path {} does not exist"
 
     model_file, onnx_path, onnx_rmqdq_path, cache_rmqdq_path, prep_path, \
-    trt_fp16_epath, trt_int8_epath, trt_int8_rmqdq_epath, profile_file = prepare_env(args.model_zoo_path)
+    trt_fp16_epath, trt_int8_epath, trt_int8_fx_epath, profile_file = prepare_env(args)
 
     fprof = open(profile_file, 'a')
 
@@ -84,7 +87,7 @@ if __name__ == '__main__':
                 suffix = '_ptq'
                 fp32_top1, ptq_int8_top1, pptq_int8_top1 = float(quant_info[1]), float(quant_info[2]), 0.0
             else:
-                suffix = '_mse_pptq'
+                suffix = '_{}_pptq'.format(args.sensitivity_method)
                 fp32_top1, ptq_int8_top1, pptq_int8_top1 = float(quant_info[1]), float(quant_info[2]), float(quant_info[3])
             onnx_file = os.path.join(onnx_path, model_name + suffix + '.onnx')
             model_prep = os.path.join(prep_path, model_name + '_preproc.json')
@@ -168,37 +171,26 @@ if __name__ == '__main__':
                                                                                                     int8_latency,
                                                                                                     int8_qps))
 
-            # build int8 trt engine via using calibration cache file
-            calibset = ImageNetCalibDataset(args.calib_input,
-                                            input_size[1],
-                                            interpolation=interpolation,
-                                            mean=mean,
-                                            std=std,
-                                            cropt_pct=crop_pct)
+            # build int8 trt engine optimized by fx
             kwargs = dict()
             kwargs['precision'] = 'int8'
-            kwargs['calib_num_images'] = args.calib_num_images
-            kwargs['calib_batch_size'] = args.calib_batch_size
-            kwargs['calib_algo'] = args.calib_algo
-            kwargs['calib_dataset'] = calibset
-            kwargs['calib_file'] = cache_rmqdq_file
             kwargs['io_format'] = args.io_format
             kwargs['io_datatype'] = args.io_datatype
-            trt_int8_rmqdq_engine = os.path.join(trt_int8_rmqdq_epath, model_name + suffix + '_rmqdq_int8.trt')
-            kwargs['engine'] = trt_int8_rmqdq_engine
+            trt_int8_fx_engine = os.path.join(trt_int8_fx_epath, model_name + suffix + '_int8_fx.trt')
+            kwargs['engine'] = trt_int8_fx_engine
             kwargs['graph_dump'] = args.graph_dump
-            trt_engine_build(onnx_rmqdq_file, input_shapes, args.verbose, **kwargs)
+            trt_engine_build(onnx_file, input_shapes, args.verbose, **kwargs)
 
             if args.graph_dump:
-                trt_int8_rmqdq_engine = trt_int8_rmqdq_engine.replace('.trt', '_profiled.trt')
-            evaluator = Evaluator(trt_int8_rmqdq_engine, val_loader, dtype=args.io_datatype)
-            int8_rmqdq_top1, int8_rmqdq_top5, int8_rmqdq_latency, int8_rmqdq_qps = evaluator.evaluate()
-            print("INT8 RMQDQ TOP1 = {:.2f}, INT8 RMQDQ TOP5 = {:.2f}, INT8 RMQDQ LAT={:.2f}, INT8 RMQDQ QPS={:.2f}".\
+                trt_int8_fx_engine = trt_int8_fx_engine.replace('.trt', '_profiled.trt')
+            evaluator = Evaluator(trt_int8_fx_engine, val_loader, dtype=args.io_datatype)
+            int8_fx_top1, int8_fx_top5, int8_fx_latency, int8_fx_qps = evaluator.evaluate()
+            print("INT8 FX TOP1 = {:.2f}, INT8 FX TOP5 = {:.2f}, INT8 FX LAT={:.2f}, INT8 FX QPS={:.2f}".\
                                                                                                     format(
-                                                                                                    int8_rmqdq_top1,
-                                                                                                    int8_rmqdq_top5,
-                                                                                                    int8_rmqdq_latency,
-                                                                                                    int8_rmqdq_qps))
+                                                                                                    int8_fx_top1,
+                                                                                                    int8_fx_top5,
+                                                                                                    int8_fx_latency,
+                                                                                                    int8_fx_qps))
 
             prof_str = "{},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".\
                                                                                                     format(
@@ -212,9 +204,9 @@ if __name__ == '__main__':
                                                                                                     int8_top1,
                                                                                                     int8_latency,
                                                                                                     int8_qps,
-                                                                                                    int8_rmqdq_top1,
-                                                                                                    int8_rmqdq_latency,
-                                                                                                    int8_rmqdq_qps
+                                                                                                    int8_fx_top1,
+                                                                                                    int8_fx_latency,
+                                                                                                    int8_fx_qps
                                                                                                     )
             fprof.write(prof_str)
             fprof.flush()
