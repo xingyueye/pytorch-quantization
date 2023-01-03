@@ -206,9 +206,27 @@ def quant_ops_replace(model, config, quant_module_map=_DEFAULT_QUANT_MAP):
                                                       stride,
                                                       padding,
                                                       dilation,
-                                                      ceil_mode,
+                                                      ceil_mode=ceil_mode,
                                                       quant_desc_input = quant_desc.input_desc)
             set_module(model, k, quant_maxpool2d)
+        elif isinstance(m, nn.AvgPool2d):
+            kernel_size = m.kernel_size
+            stride = m.stride
+            padding = m.padding
+            ceil_mode = m.ceil_mode
+            count_include_pad = m.count_include_pad
+            quant_avgpool2d = quant_nn.AvgPool2d(kernel_size,
+                                                      stride,
+                                                      padding,
+                                                      ceil_mode,
+                                                      count_include_pad=count_include_pad,
+                                                      quant_desc_input = quant_desc.input_desc)
+            set_module(model, k, quant_avgpool2d)
+        elif isinstance(m, nn.AdaptiveAvgPool2d):
+            output_size = m.output_size
+            quant_avgpool2d = quant_nn.AdaptiveAvgPool2d(output_size,
+                                                      quant_desc_input = quant_desc.input_desc)
+            set_module(model, k, quant_avgpool2d)
         elif isinstance(m, nn.Linear):
             quant_linear = quant_nn.QuantLinear(
                                             m.in_features,
