@@ -328,27 +328,7 @@ class LSQFakeTensorQuantFunction(Function):
             grad_scale = grad_scale.sum()
         return grad_inputs, grad_scale, None, None, None
 
-class LSQFakeQuantizer(nn.Module):
-    """
-        LSQ Quantization Class
-    """
-    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
-        super().__init__()
-        self.num_bits = num_bits
-        self.unsigned = unsigned
-        self.narrow_range = narrow_range
-        self.scale_for_grad = None
-
-    def forward(self, inputs, scale, **kwargs):
-        if self.scale_for_grad is None:
-            numel = inputs.numel()
-            max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=scale.device)
-            self.scale_for_grad = torch.tensor(1.0 / ((max_bound * numel) ** 0.5), device=inputs.device)
-        _scale = balance_grad_for_scale(scale, self.scale_for_grad)
-        outputs = lsq_fake_tensor_quant(inputs, _scale, self.num_bits, self.unsigned, self.narrow_range)
-        return outputs
-
-# class StableLSQFakeTensorQuantFunction(Function):
+class StableLSQFakeTensorQuantFunction(Function):
     """A tensor quantization function with learnable scales
 
     Take an input tensor and its quantization scale, output an quantized tensor. The granularity of scale is the same with the
@@ -435,27 +415,6 @@ class LSQFakeQuantizer(nn.Module):
         grad_scale = 2 * scale * ( grad_scale)
         return grad_inputs, grad_scale, None, None, None
 
-class StableLSQFakeQuantizer(nn.Module):
-    """
-        StableLSQ Quantization Class
-    """
-    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
-        super().__init__()
-        self.num_bits = num_bits
-        self.unsigned = unsigned
-        self.narrow_range = narrow_range
-        self.scale_for_grad = None
-
-    def forward(self, inputs, scale, **kwargs):
-        if self.scale_for_grad is None:
-            numel = inputs.numel()
-            max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=scale.device)
-            self.scale_for_grad = torch.tensor(1.0 / ((max_bound * numel) ** 0.5), device=inputs.device)
-        step_size = scale ** 2
-        _scale = balance_grad_for_scale(step_size, self.scale_for_grad)
-        outputs = lsq_fake_tensor_quant(inputs, _scale, self.num_bits, self.unsigned, self.narrow_range)
-        return outputs
-
 class TensorQuantFunction(Function):
     """A universal tensor quantization function
 
@@ -537,20 +496,6 @@ class FakeTensorQuantFunction(Function):
         zero = grad_outputs.new_zeros(1)
         grad_inputs = torch.where(inputs.abs() <= amax, grad_outputs, zero)
         return grad_inputs, None, None, None, None
-
-class NaiveFakeQuantizer(nn.Module):
-    """
-        Naive Quantization Class
-    """
-    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
-        super().__init__()
-        self.num_bits = num_bits
-        self.unsigned = unsigned
-        self.narrow_range = narrow_range
-
-    def forward(self, inputs, amax, **kwargs):
-        outputs = fake_tensor_quant(inputs, amax, self.num_bits, self.unsigned, self.narrow_range)
-        return outputs
 
 class LSQPLUSFakeTensorQuantFunction(Function):
     """A tensor quantization function with learnable scales
@@ -648,27 +593,6 @@ class LSQPLUSFakeTensorQuantFunction(Function):
             grad_offset = grad_offset.sum()
         
         return grad_inputs, grad_scale, grad_offset, None, None, None
-
-class LSQPlusFakeQuantizer(nn.Module):
-    """
-        LSQ+ Quantization Class
-    """
-    def __init__(self, num_bits=8, unsigned=False, narrow_range=True, **kwargs):
-        super().__init__()
-        self.num_bits = num_bits
-        self.unsigned = unsigned
-        self.narrow_range = narrow_range
-        self.scale_for_grad = None
-
-    def forward(self, inputs, scale, offset, **kwargs):
-        if self.scale_for_grad is None:
-            numel = inputs.numel()
-            max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=scale.device)
-            self.scale_for_grad = torch.tensor(1.0 / ((max_bound * numel) ** 0.5), device=inputs.device)
-        _scale = balance_grad_for_scale(scale, self.scale_for_grad)
-        _offset = balance_grad_for_scale(offset, self.scale_for_grad)
-        outputs = lsq_plus_fake_tensor_quant(inputs, _scale, _offset, self.num_bits, self.unsigned, self.narrow_range)
-        return outputs
 
 def _tensor_quant_scale_offset(inputs, scale, offset, max_bound=127, min_bound=-128):
     """
