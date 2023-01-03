@@ -110,10 +110,10 @@ class ScaledQuantDescriptor():
         if kwargs:
             raise TypeError("Unused keys: {}".format(kwargs.keys()))
 
-    # pylint:disable=missing-docstring
-    @property
-    def quantizer_type(self):
-        return self.quantizer_type
+    # # pylint:disable=missing-docstring
+    # @property
+    # def quantizer_type(self):
+    #     return self.quantizer_type
 
     @property
     def num_bits(self):

@@ -73,7 +73,7 @@ class LSQTensorQuantizer(TensorQuantizer):
         super(LSQTensorQuantizer, self).__init__(quant_desc, disabled, if_quant, if_clip, if_calib)
 
         self._learn_scale = quant_desc._learn_scale
-        self._learn_scale_type = quant_desc._learn_scale_type
+        self.quantizer_type = quant_desc.quantizer_type
         assert quant_desc._learn_scale, "LSQ series Quantizer need the learnable scale!"
         self._learn_scale_init = False
         self.scale_for_grad = None
@@ -96,7 +96,7 @@ class LSQTensorQuantizer(TensorQuantizer):
         if getattr(self, '_calibrator', None) is None:
             raise RuntimeError("Calibrator not created.")
         calib_amax = self._calibrator.compute_amax()
-        # if self._learn_scale and self._learn_scale_type == 'lsq':
+        # if self._learn_scale and self.quantizer_type == 'lsq':
         #     calib_amax = self._calibrator.compute_amax_lsq()
         # else:
         #     raise "Unsupported amax computing method for LSQ Quantizer!"
