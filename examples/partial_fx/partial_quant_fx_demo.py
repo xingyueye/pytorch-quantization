@@ -449,7 +449,6 @@ def export_onnx(model, onnx_path, args, data_config):
                       output_names=['output'],
                       verbose=False,
                       opset_version=13,
-                      enable_onnx_checker=True,
                       do_constant_folding=True,
                       operator_export_type=torch.onnx.OperatorExportTypes.ONNX)
 

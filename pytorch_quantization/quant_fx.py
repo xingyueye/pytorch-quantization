@@ -28,6 +28,7 @@ def insert_qdq_nodes(model, calib_method, num_bits=8):
     return model_traced
 
 def insert_qdq_nodes_via_subgraph_match(model, quantizer_desc):
+    model.eval()
     # We use LowerQuantOpTracer
     model_traced = fx.GraphModule(model, fx_utils.LowerQuantOpTracer().trace(model))
     # Pattern match
