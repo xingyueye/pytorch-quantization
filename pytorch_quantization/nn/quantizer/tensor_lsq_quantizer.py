@@ -116,8 +116,9 @@ class LSQTensorQuantizer(TensorQuantizer):
             self.register_buffer('_amax', calib_amax.data)
         else:
             self._amax.copy_(calib_amax)
+        self.init_qat_param()
 
-    def _param_init(self, inputs=None):
+    def _param_init(self,):
         init_weight = self._amax
         value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
         epsilon = 1. / (1 << 24)
@@ -130,9 +131,9 @@ class LSQTensorQuantizer(TensorQuantizer):
         else:
             self.register_parameter('_scale', value)
 
-    def init_qat_param(self, inputs=None):
+    def init_qat_param(self,):
         """Initialize learned scale from PTQ amax or lsq_init"""
-        self._param_init(inputs)
+        self._param_init()
         self._learn_scale_init = True  
 
     def _quant_forward(self, inputs):

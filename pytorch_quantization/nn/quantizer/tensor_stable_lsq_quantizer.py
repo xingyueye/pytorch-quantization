@@ -100,8 +100,9 @@ class StableLSQTensorQuantizer(LSQTensorQuantizer):
             self.register_buffer('_amax', calib_amax.data)
         else:
             self._amax.copy_(calib_amax)
+        self.init_qat_param()
 
-    def _param_init(self, inputs=None):
+    def _param_init(self,):
         qmax = 2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0
         value = torch.nn.Parameter((self._amax / qmax) ** 0.5, requires_grad=True)
         if hasattr(self, '_scale'):

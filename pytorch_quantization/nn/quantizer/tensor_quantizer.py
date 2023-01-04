@@ -22,7 +22,6 @@ import torch
 from torch import nn
 
 from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant, lsq_fake_tensor_quant, lsq_plus_fake_tensor_quant
-from pytorch_quantization.tensor_quant import LSQFakeQuantizer, LSQPlusFakeQuantizer, NaiveFakeQuantizer, StableLSQFakeQuantizer
 from pytorch_quantization.nn.modules.clip import Clip
 # from pytorch_quantization.nn.modules.grad_scale import GradScale
 
@@ -246,6 +245,7 @@ class TensorQuantizer(nn.Module):
             self.register_buffer('_amax', calib_amax.data)
         else:
             self._amax.copy_(calib_amax)
+        self.init_qat_param()
 
     def init_learn_amax(self):
         """Initialize learned amax from fixed amax"""
@@ -301,7 +301,7 @@ class TensorQuantizer(nn.Module):
 
         return outputs
     
-    def init_qat_param(self, inputs=None):
+    def init_qat_param(self,):
         pass
 
     def _quant_forward(self, inputs):

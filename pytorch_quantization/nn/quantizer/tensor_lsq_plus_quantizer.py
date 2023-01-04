@@ -109,8 +109,9 @@ class LSQPlusTensorQuantizer(LSQTensorQuantizer):
             self.register_buffer('_amin', calib_amin.data)
         else:
             self._amin.copy_(calib_amin)
+        self.init_qat_param()
 
-    def _param_init(self, inputs=None):
+    def _param_init(self,):
         range = self._amax - self._amin
         qmax = 2.0**(self._num_bits) - 1.0
         scale = torch.nn.Parameter(range / qmax, requires_grad=True)

@@ -27,9 +27,7 @@ from pytorch_quantization.quant_utils import module_quant_disable, module_quant_
 from pytorch_quantization import nn as quant_nn
 from pytorch_quantization import calib
 from pytorch_quantization.tensor_quant import QuantDescriptor
-from pytorch_quantization.quant_fx import insert_qdq_nodes
-from pytorch_quantization import quant_modules
-from pytorch_quantization import tensor_quant
+from pytorch_quantization.quant_intf import quant_model_init
 
 parser = argparse.ArgumentParser(description='PyTorch Partial Quantiztion Demo')
 parser.add_argument('--data', metavar='DIR',
@@ -55,6 +53,8 @@ parser.add_argument('--num-classes', type=int, default=None,
 parser.add_argument('--output', type=str, default='./',
                     help='output directory of results')
 
+parser.add_argument('--quant_config', type=str, default='./partial_config.yaml',
+                    help='quantzaiton configuration')
 parser.add_argument('--num_bits', type=int, default=8,
                     help='quantization bit width')
 parser.add_argument('--method', type=str, default='entropy', choices=['max', 'entropy', 'percentile', 'mse'],
@@ -455,9 +455,6 @@ def export_onnx(model, onnx_path, args, data_config):
 
 
 def main(args):
-    quant_modules.initialize()
-    quant_config(args)
-
     model = create_model(
         args.model,
         pretrained=args.pretrained,
@@ -469,7 +466,7 @@ def main(args):
 
     data_config = resolve_data_config(vars(args), model=model, use_test_size=True, verbose=True)
     print(data_config)
-    model = insert_qdq_nodes(model, args.method, args.num_bits)
+    model, qconf = quant_model_init(model, args.quant_config)
     model = model.cuda()
     model.eval()
 
@@ -547,9 +544,10 @@ def main(args):
 
     save_preproc_config(args.model, data_config, os.path.join(args.output, 'prep'))
     if args.calib_weight is None:
+        calib_num = qconf.calib_data_nums // args.batch_size
         with torch.no_grad():
-            collect_stats(model, train_loader, args.calib_num)
-            compute_amax(model, method=args.method, percentile=args.percentile)
+            collect_stats(model, train_loader, calib_num)
+            compute_amax(model, method=qconf.a_qscheme.calib_method, percentile=qconf.a_qscheme.percentile)
         torch.save(model.state_dict(), os.path.join(os.path.join(args.output, 'calib'), args.model + '_calib.pth'))
     else:
         model.load_state_dict(torch.load(args.calib_weight))
@@ -561,13 +559,13 @@ def main(args):
     quant_acc1 = validate_model(val_loader, model)
 
     if ori_acc1 - quant_acc1 > args.drop:
-        if args.sensitivity_method == 'top1':
+        if qconf.partial_ptq.sensitivity_method == 'top1':
             suffix = "top1_pptq"
             sensitivity_list = top1_sensitivity(model, mini_loader)
             sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
         else:
-            suffix = "{}_pptq".format(args.sensitivity_method)
-            sensitivity_list = sensitivity_analyse(model, val_loader, args.sensitivity_method)
+            suffix = "{}_pptq".format(qconf.partial_ptq.sensitivity_method)
+            sensitivity_list = sensitivity_analyse(model, val_loader, qconf.partial_ptq.sensitivity_method)
             sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
 
         print(sensitivity_list)
@@ -576,8 +574,8 @@ def main(args):
             skip_layers, partial_acc1 = partial_quant_skip_layers(model, val_loader, skip_layers_list)
         else:
             skip_layers, partial_acc1 = partial_quant(sensitivity_list, model, val_loader, ori_acc1, quant_acc1,
-                                                      args.drop,
-                                                      args.per_layer_drop)
+                                                      qconf.partial_ptq.drop,
+                                                      qconf.partial_ptq.per_layer_drop)
         write_results(os.path.join(os.path.join(args.output, 'results'), args.model + "_{}.txt".format(suffix)),
                       args.model,
                       ori_acc1,
