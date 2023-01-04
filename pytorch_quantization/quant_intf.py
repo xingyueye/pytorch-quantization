@@ -213,7 +213,7 @@ def get_quant_module_map(quant_layers_type=[]):
 
 def quant_insert_qdq(model, config):
     quant_desc = get_quant_desc(config)
-    return insert_qdq_nodes_via_subgraph_match(model, quant_desc)
+    return insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc)
 
 def quant_model_init(model, config_file, calib_weights=''):
     config = parse_config(config_file)
