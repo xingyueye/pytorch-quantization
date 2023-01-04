@@ -547,7 +547,7 @@ def main(args):
         calib_num = qconf.calib_data_nums // args.batch_size
         with torch.no_grad():
             collect_stats(model, train_loader, calib_num)
-            compute_amax(model, method=qconf.a_qscheme.calib_method, percentile=qconf.a_qscheme.percentile)
+            compute_amax(model, method=qconf.a_qscheme.hist_method, percentile=qconf.a_qscheme.percentile)
         torch.save(model.state_dict(), os.path.join(os.path.join(args.output, 'calib'), args.model + '_calib.pth'))
     else:
         model.load_state_dict(torch.load(args.calib_weight))
