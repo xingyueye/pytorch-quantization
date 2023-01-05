@@ -75,6 +75,7 @@ class LSQTensorQuantizer(TensorQuantizer):
         self._learn_scale = quant_desc._learn_scale
         self.quantizer_type = quant_desc.quantizer_type
         assert quant_desc._learn_scale, "LSQ series Quantizer need the learnable scale!"
+        # we may remove _learn_scale_init in future
         self._learn_scale_init = False
         self.scale_for_grad = None
 
@@ -186,3 +187,42 @@ class LSQTensorQuantizer(TensorQuantizer):
             outputs = self._quant_forward(inputs)
 
         return outputs
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        """Overloaded module function
+
+        Adds warnings during state_dict loading.
+        A workaround is implemented for loading amax from checkpoint and only supports CUDA.
+
+        Args:
+            state_dict: A dict containing the state of the top level module
+            prefix: A string that prefixes all of this modules state in state_dict, e.g. 'model.conv1.'
+        """
+        dst_has_amax = '_amax' in self._buffers
+        src_has_amax = prefix + '_amax' in state_dict
+
+        if not src_has_amax and dst_has_amax:
+            logging.error("{}: No amax in state_dict.".format(prefix[:-1]))
+        elif src_has_amax and not dst_has_amax:
+            logging.debug(("{}: No '_amax' buffer to load amax into."
+                           " '_amax` will be created as WAR for now. "
+                           "This behavior will change in future.").format(prefix[:-1]))
+            self.register_buffer("_amax", state_dict[prefix + '_amax'].data.cuda())
+        elif src_has_amax and dst_has_amax:
+            logging.warning("{}: Overwriting amax.".format(prefix[:-1]))
+
+        dst_has_scale = '_scale' in self._parameters
+        src_has_scale = prefix + '_scale' in state_dict
+
+        if not src_has_scale and dst_has_scale:
+            logging.error("{}: No scale in state_dict.".format(prefix[:-1]))
+        elif src_has_scale and not dst_has_scale:
+            logging.debug(("{}: No '_scale' parameter to load scale into."
+                           " '_scale` will be created as WAR for now. "
+                           "This behavior will change in future.").format(prefix[:-1]))
+            self.register_parameter("_scale", nn.Parameter(state_dict[prefix + '_scale']))
+            self._learn_scale_init = True
+        elif src_has_scale and dst_has_scale:
+            logging.warning("{}: Overwriting scale.".format(prefix[:-1]))
+
+        super(TensorQuantizer, self)._load_from_state_dict(state_dict, prefix, *args, **kwargs)
