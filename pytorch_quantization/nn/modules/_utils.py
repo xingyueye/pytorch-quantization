@@ -136,7 +136,8 @@ class QuantInputMixin():
                      if not quant_desc_input.fake_quant else "fake ",
                      quant_desc_input.num_bits, self.__class__.__name__, quant_desc_input.axis)
 
-        self._input_quantizer = TensorQuantizer(quant_desc_input)
+        input_tensor_quantizer = TENSOR_QUANTIZER_MAP[quant_desc_input.quantizer_type]
+        self._input_quantizer = input_tensor_quantizer(quant_desc_input)
 
     # pylint:disable=missing-docstring
     @property
