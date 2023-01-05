@@ -368,12 +368,12 @@ class TensorQuantizer(nn.Module):
                                                  self._amax.numel(), fmt=fmt)
 
     def _short_scale(self, fmt='.4f'):
-        """Short description of amax
+        """Short description of scale
 
         Returns:
-            'dynamic': if _amax is not registered
-            'amax': if _amax is per-tensor
-            '[min, max](size)': if _amax is per-channel
+            'None': if _scale is not registered
+            'scale': if _scale is per-tensor
+            '[min, max](size)': if _scale is per-channel
         """
         if not hasattr(self, '_scale'):
             return 'None'
