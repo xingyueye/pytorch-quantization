@@ -148,6 +148,7 @@ class LSQTensorQuantizer(TensorQuantizer):
             self.init_qat_param(inputs)
 
         _scale = GradScaleFunction.apply(self._scale, self.scale_for_grad)
+        _scale = _scale.abs()
         amax = _scale * self.max_bound
 
         if self._fake_quant:
