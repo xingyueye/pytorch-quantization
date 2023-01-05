@@ -107,11 +107,17 @@ def get_quant_desc(config):
     }
     return EasyDict(quant_desc)
 
+def skip_layers_check(k, config):
+    return True if k in config.skip_layers else False
+
 def quant_ops_replace(model, config, quant_module_map=_DEFAULT_QUANT_MAP):
     quant_desc = get_quant_desc(config)
 
     for k, m in model.named_modules():
         if not m.__class__.__name__ in quant_module_map:
+            continue
+        if skip_layers_check(k, config):
+            print("Skip Layer {}".format(k))
             continue
         if isinstance(m, nn.Conv2d):
             in_channels = m.in_channels
