@@ -1,8 +1,14 @@
 import torch.fx as fx
-import torch.nn as nn
-from pytorch_quantization.nn import TensorQuantizer
+from pytorch_quantization.nn import TensorQuantizer, LSQTensorQuantizer, StableLSQTensorQuantizer, LSQPlusTensorQuantizer
 from pytorch_quantization.graph.fx_pattern import *
 from pytorch_quantization.graph import fx_utils
+
+FX_TENSOR_QUANT_MAP = {
+    "naive": TensorQuantizer,
+    "lsq": LSQTensorQuantizer,
+    "stable_lsq": StableLSQTensorQuantizer,
+    "lsq_plus": LSQPlusTensorQuantizer
+}
 
 class PatternMatcher(object):
     def __init__(self):
@@ -26,7 +32,7 @@ class ConvBnResReluTypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.args[0].name)
 
                 res_add_quantizer_name = F"{'.'.join(node.args[0].name.split('.'))}._input_quantizer"
-                res_add_quantizer = TensorQuantizer(quantizer_desc)
+                res_add_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(res_add_quantizer_name, res_add_quantizer)
                 # The matched end node is ReLU, whose args[0] is the add node we want to add quantizer to
                 fx_utils.add_quantizer(node.args[0], model_traced, (1,), (res_add_quantizer_name,))
@@ -45,19 +51,19 @@ class SEReLUTypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.name, node.args[0].name)
 
                 res_add_quantizer_name = F"{'.'.join(node.name.split('.'))}._input_quantizer"
-                res_add_quantizer = TensorQuantizer(quantizer_desc)
+                res_add_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(res_add_quantizer_name, res_add_quantizer)
                 # The matched end node is Add, whose 2nd input we want to add quantizer to
                 fx_utils.add_quantizer(node, model_traced, (1,), (res_add_quantizer_name,))
                 # insert quantizer to mul identity branch
                 mul_quantizer_name = F"{'.'.join(node.args[0].name.split('.'))}._input_quantizer"
-                mul_quantizer = TensorQuantizer(quantizer_desc)
+                mul_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(mul_quantizer_name, mul_quantizer)
                 fx_utils.add_quantizer(node.args[0], model_traced, (0,), (mul_quantizer_name,))
                 # insert quantizer before sigmoid
                 sigmoid_node = node.args[0].args[1]
                 sigmoid_quantizer_name = F"{'.'.join(sigmoid_node.name.split('.'))}._input_quantizer"
-                sigmoid_quantizer = TensorQuantizer(quantizer_desc)
+                sigmoid_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(sigmoid_quantizer_name, sigmoid_quantizer)
                 # node.args[1] is sigmoid node, whose 1st input we want to add quantizer to
                 fx_utils.add_quantizer(sigmoid_node, model_traced, (0,), (sigmoid_quantizer_name,))
@@ -77,14 +83,14 @@ class SESiLUTypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.name, node.args[1].name)
 
                 res_mul_quantizer_name = F"{'.'.join(node.name.split('.'))}._input_quantizer"
-                res_mul_quantizer = TensorQuantizer(quantizer_desc)
+                res_mul_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(res_mul_quantizer_name, res_mul_quantizer)
                 # The matched end node is Mul, whose 1st input we want to add quantizer to
                 fx_utils.add_quantizer(node, model_traced, (0,), (res_mul_quantizer_name,))
 
                 # insert quantizer before sigmoid
                 sigmoid_quantizer_name = F"{'.'.join(node.args[1].name.split('.'))}._input_quantizer"
-                sigmoid_quantizer = TensorQuantizer(quantizer_desc)
+                sigmoid_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(sigmoid_quantizer_name, sigmoid_quantizer)
                 # node.args[1] is sigmoid node, whose 1st input we want to add quantizer to
                 fx_utils.add_quantizer(node.args[1], model_traced, (0,), (sigmoid_quantizer_name,))
@@ -103,7 +109,7 @@ class DropActDropPathAddTypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.name)
 
                 res_add_quantizer_name = F"{'.'.join(node.name.split('.'))}._input_quantizer"
-                res_add_quantizer = TensorQuantizer(quantizer_desc)
+                res_add_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(res_add_quantizer_name, res_add_quantizer)
                 # The matched end node is Add, whose snd input we want to add quantizer to
                 fx_utils.add_quantizer(node, model_traced, (1,), (res_add_quantizer_name,))
@@ -121,7 +127,7 @@ class MeanTypePatternMatcher(PatternMatcher):
             if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
                 print('node: ', node, node.name)
                 mean_quantizer_name = F"{'.'.join(node.name.split('.'))}._input_quantizer"
-                mean_quantizer = TensorQuantizer(quantizer_desc)
+                mean_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(mean_quantizer_name, mean_quantizer)
 
                 # The matched end node is mean, whose snd input we want to add quantizer to
