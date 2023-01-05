@@ -1,0 +1,39 @@
+quant_layers_type: []         # nn.Conv2d / nn.Linear / ...
+
+w_qscheme:
+    quantizer_type: "stable_lsq"    # tensor-quantizer type : naive/lsq/stable-lsq/lsq-plus
+    bit: 4                          # bit-width
+    symmetry: True                  # default symmetry for TRT
+    per_channel: True               # default per_channle for weights
+    calib_method: "max"             # default 'max' for weights calibration
+    percentile: 0.99                # used for histogram calibration
+
+a_qscheme:
+    quantizer_type: "stable_lsq"    # tensor-quantizer type
+    bit: 4
+    symmetry: True
+    per_channel: False          # default per_tensor for weights
+    calib_method: "histogram"   # default 'histogram' for activation calibration
+    percentile: 0.99            # used for histogram calibration
+    hist_method: 'entropy'      # 'entropy', 'percentile', 'mse'
+
+calib_data_nums: 128            # total number of data used to calibrate the model
+
+partial_ptq:
+    sensitivity_method: "mse"   #'mse', 'cosine', 'top1', 'snr'
+    drop: 0.5                   # endurable accuracy drop
+    skip_ratio: 0.1             # max proportion of skipped sensetive layers
+
+quant_layers: []              # manually specify quantized layers
+skip_layers: ["conv1", "fc"]               # manually specify skipped layers
+special_layers:               # manually specify layers
+    layers_list: [
+                   {layer_name: "xxx",
+                    w_qscheme: "xxx_w_qscheme",
+                    a_qscheme: "xxx_a_qscheme"},
+                    # ....
+                ]
+xxx_w_qscheme:
+   # ...
+xxx_a_qscheme:
+   # ...
