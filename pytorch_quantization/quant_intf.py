@@ -232,9 +232,13 @@ def quant_model_init(model, config_file, calib_weights=''):
         model.load_state_dict(state_dict['model'].state_dict())
     return model, config
 
-def save_calib_model(model, config):
+def save_calib_model(model_name, model, config):
     # Save calibrated checkpoint
-    output_model_path = "calib_{}_w{}a{}_{}.pt".format(config.calib_data_nums, config.w_qscheme.bit, config.a_qscheme.bit, config.a_qscheme.quantizer_type)
+    output_model_path = "{}_calib_{}_w{}a{}_{}.pt".format(model_name,
+                                                          config.calib_data_nums,
+                                                          config.w_qscheme.bit,
+                                                          config.a_qscheme.bit,
+                                                          config.a_qscheme.quantizer_type)
     print('Saving calibrated model to {}... '.format(output_model_path))
     torch.save({'model': model}, output_model_path)
 
@@ -248,7 +252,6 @@ def quant_model_calib_timm(model, data_loader, config, batch_size):
     with torch.no_grad():
         collect_stats(model, data_loader, calib_batch)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
-    save_calib_model(model, config)
 
 def quant_model_export(model, onnx_path, data_shape):
     quant_nn.TensorQuantizer.use_fb_fake_quant = True

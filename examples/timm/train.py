@@ -38,7 +38,7 @@ from timm.optim import create_optimizer_v2, optimizer_kwargs
 from timm.scheduler import create_scheduler
 from timm.utils import ApexScaler, NativeScaler
 
-from pytorch_quantization.quant_intf import quant_model_init, quant_model_calib_timm, quant_model_export
+from pytorch_quantization.quant_intf import quant_model_init, quant_model_calib_timm, save_calib_model
 
 try:
     from apex import amp
@@ -632,6 +632,7 @@ def main():
     if args.calib:
         if args.local_rank == 0:
             quant_model_calib_timm(model, loader_train, config, args.batch_size)
+            save_calib_model(args.model, model, config)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
         return
 
