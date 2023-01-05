@@ -631,7 +631,7 @@ def main():
 
     if args.calib:
         if args.local_rank == 0:
-            quant_model_calib_timm(model, loader_train, config)
+            quant_model_calib_timm(model, loader_train, config, args.batch_size)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
         return
 

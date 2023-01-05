@@ -238,13 +238,13 @@ def save_calib_model(model, config):
     print('Saving calibrated model to {}... '.format(output_model_path))
     torch.save({'model': model}, output_model_path)
 
-def quant_model_calib_timm(model, data_loader, config):
+def quant_model_calib_timm(model, data_loader, config, batch_size):
     model.eval()
     model.cuda()
     # It is a bit slow since we collect histograms on CPU
 
     calib_num = min(config.calib_data_nums, len(data_loader.dataset))
-    calib_batch = calib_num // data_loader.batch_size
+    calib_batch = calib_num // batch_size
     with torch.no_grad():
         collect_stats(model, data_loader, calib_batch)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)

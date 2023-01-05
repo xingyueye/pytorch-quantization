@@ -367,6 +367,23 @@ class TensorQuantizer(nn.Module):
         return '[{:{fmt}}, {:{fmt}}]({})'.format(self._amax.min().item(), self._amax.max().item(),
                                                  self._amax.numel(), fmt=fmt)
 
+    def _short_scale(self, fmt='.4f'):
+        """Short description of amax
+
+        Returns:
+            'dynamic': if _amax is not registered
+            'amax': if _amax is per-tensor
+            '[min, max](size)': if _amax is per-channel
+        """
+        if not hasattr(self, '_scale'):
+            return 'None'
+        if self._scale is None:
+            return 'Unintialized'
+        if self._scale.numel() == 1:
+            return '{:{fmt}}'.format(self._scale.item(), fmt=fmt)
+        return '[{:{fmt}}, {:{fmt}}]({})'.format(self._scale.min().item(), self._scale.max().item(),
+                                                 self._scale.numel(), fmt=fmt)
+
     def extra_repr(self):
         if self._disabled:
             return "disabled"
@@ -378,7 +395,7 @@ class TensorQuantizer(nn.Module):
         s += " *{}".format(self._scale_amax) if self._scale_amax else ""
         s += " learned" if (self._learn_amax) else ""
         s += " calibrator={}".format(self._calibrator.__class__.__name__) if (self._calibrator is not None) else ""
-        s += " scale={}".format(self._scale) if hasattr(self, '_scale') and self._scale is not None else ""
+        s += " scale={}".format(self._short_scale())
         s += " quant" if (self._if_quant) else ""
         s += " clip" if (self._if_clip) else ""
         s += " calib" if (self._if_calib) else ""
