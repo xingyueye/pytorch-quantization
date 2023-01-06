@@ -116,7 +116,7 @@ class StableLSQTensorQuantizer(LSQTensorQuantizer):
             self.max_bound = torch.tensor((2.0**(self.num_bits - 1 + int(self.unsigned))) - 1.0, device=inputs.device)
             self.scale_for_grad = torch.tensor(1.0 / ((self.max_bound * numel) ** 0.5), device=inputs.device)
         if not self._learn_scale_init:
-            self.init_qat_param(inputs)
+            self.init_qat_param()
         step_size = self._scale ** 2
         _scale = GradScaleFunction.apply(step_size, self.scale_for_grad)
         amax = _scale * self.max_bound
