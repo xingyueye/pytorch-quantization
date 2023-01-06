@@ -9,6 +9,7 @@ from pytorch_quantization import calib
 from pytorch_quantization.tensor_quant import QuantDescriptor
 from pytorch_quantization.quant_utils import set_module
 from pytorch_quantization.quant_fx import insert_qdq_nodes_via_subgraph_match
+from pytorch_quantization.nn.modules.converter import *
 
 
 _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
@@ -114,100 +115,103 @@ def quant_ops_replace(model, config, quant_module_map=_DEFAULT_QUANT_MAP):
     quant_desc = get_quant_desc(config)
 
     for k, m in model.named_modules():
-        if not m.__class__.__name__ in quant_module_map:
-            continue
         if skip_layers_check(k, config):
             print("Skip Layer {}".format(k))
             continue
-        if isinstance(m, nn.Conv2d):
-            in_channels = m.in_channels
-            out_channels = m.out_channels
-            kernel_size = m.kernel_size
-            stride = m.stride
-            padding = m.padding
-            groups = m.groups
-            quant_conv = quant_nn.QuantConv2d(in_channels,
-                                              out_channels,
-                                              kernel_size,
-                                              stride,
-                                              padding,
-                                              groups=groups,
-                                              quant_desc_input = quant_desc.input_desc,
-                                              quant_desc_weight = quant_desc.conv_weight_desc)
-            quant_conv.weight.data.copy_(m.weight.detach())
-            if m.bias is not None:
-                quant_conv.bias.data.copy_(m.bias.detach())
-            else:
-                quant_conv.bias = None
-            set_module(model, k, quant_conv)
-        elif isinstance(m, nn.ConvTranspose2d):
-            in_channels = m.in_channels
-            out_channels = m.out_channels
-            kernel_size = m.kernel_size
-            stride = m.stride
-            padding = m.padding
-            groups = m.groups
-            quant_convtrans = quant_nn.QuantConvTranspose2d(in_channels,
-                                                       out_channels,
-                                                       kernel_size,
-                                                       stride,
-                                                       padding,
-                                                       groups=groups,
-                                                       quant_desc_input = quant_desc.input_desc,
-                                                       quant_desc_weight = quant_desc.deconv_weight_desc)
-            quant_convtrans.weight.data.copy_(m.weight.detach())
-            if m.bias is not None:
-                quant_convtrans.bias.data.copy_(m.bias.detach())
-            else:
-                quant_convtrans.bias = None
-            set_module(model, k, quant_convtrans)
-        elif isinstance(m, nn.MaxPool2d):
-            kernel_size = m.kernel_size
-            stride = m.stride
-            padding = m.padding
-            dilation = m.dilation
-            ceil_mode = m.ceil_mode
-            quant_maxpool2d = quant_nn.QuantMaxPool2d(kernel_size,
-                                                      stride,
-                                                      padding,
-                                                      dilation,
-                                                      ceil_mode=ceil_mode,
-                                                      quant_desc_input = quant_desc.input_desc)
-            set_module(model, k, quant_maxpool2d)
-        elif isinstance(m, nn.AvgPool2d):
-            kernel_size = m.kernel_size
-            stride = m.stride
-            padding = m.padding
-            ceil_mode = m.ceil_mode
-            count_include_pad = m.count_include_pad
-            quant_avgpool2d = quant_nn.AvgPool2d(kernel_size,
-                                                      stride,
-                                                      padding,
-                                                      ceil_mode,
-                                                      count_include_pad=count_include_pad,
-                                                      quant_desc_input = quant_desc.input_desc)
-            set_module(model, k, quant_avgpool2d)
-        elif isinstance(m, nn.AdaptiveAvgPool2d):
-            output_size = m.output_size
-            quant_avgpool2d = quant_nn.AdaptiveAvgPool2d(output_size,
-                                                      quant_desc_input = quant_desc.input_desc)
-            set_module(model, k, quant_avgpool2d)
-        elif isinstance(m, nn.Linear):
-            quant_linear = quant_nn.QuantLinear(
-                                            m.in_features,
-                                            m.out_features,
-                                            quant_desc_input = quant_desc.input_desc,
-                                            quant_desc_weight = quant_desc.deconv_weight_desc)
-            quant_linear.weight.data.copy_(m.weight.detach())
-            if m.bias is not None:
-                quant_linear.bias.data.copy_(m.bias.detach())
-            else:
-                quant_linear.bias = None
-            # quant_linear.to(m.weight.device)
-            set_module(model, k, quant_linear)
-        else:
-            # module can not be quantized, continue
-            continue
+        module_type = m.__class__.__name__
+        if module_type in quant_module_map:
+            converter = globals()['{}Converter'.format(module_type)](quant_desc)
+            set_module(model, k, converter.convert(m))
+
+        # if isinstance(m, nn.Conv2d):
+        #     in_channels = m.in_channels
+        #     out_channels = m.out_channels
+        #     kernel_size = m.kernel_size
+        #     stride = m.stride
+        #     padding = m.padding
+        #     groups = m.groups
+        #     quant_conv = quant_nn.QuantConv2d(in_channels,
+        #                                       out_channels,
+        #                                       kernel_size,
+        #                                       stride,
+        #                                       padding,
+        #                                       groups=groups,
+        #                                       quant_desc_input = quant_desc.input_desc,
+        #                                       quant_desc_weight = quant_desc.conv_weight_desc)
+        #     quant_conv.weight.data.copy_(m.weight.detach())
+        #     if m.bias is not None:
+        #         quant_conv.bias.data.copy_(m.bias.detach())
+        #     else:
+        #         quant_conv.bias = None
+        #     set_module(model, k, quant_conv)
+        # elif isinstance(m, nn.ConvTranspose2d):
+        #     in_channels = m.in_channels
+        #     out_channels = m.out_channels
+        #     kernel_size = m.kernel_size
+        #     stride = m.stride
+        #     padding = m.padding
+        #     groups = m.groups
+        #     quant_convtrans = quant_nn.QuantConvTranspose2d(in_channels,
+        #                                                out_channels,
+        #                                                kernel_size,
+        #                                                stride,
+        #                                                padding,
+        #                                                groups=groups,
+        #                                                quant_desc_input = quant_desc.input_desc,
+        #                                                quant_desc_weight = quant_desc.deconv_weight_desc)
+        #     quant_convtrans.weight.data.copy_(m.weight.detach())
+        #     if m.bias is not None:
+        #         quant_convtrans.bias.data.copy_(m.bias.detach())
+        #     else:
+        #         quant_convtrans.bias = None
+        #     set_module(model, k, quant_convtrans)
+        # elif isinstance(m, nn.MaxPool2d):
+        #     kernel_size = m.kernel_size
+        #     stride = m.stride
+        #     padding = m.padding
+        #     dilation = m.dilation
+        #     ceil_mode = m.ceil_mode
+        #     quant_maxpool2d = quant_nn.QuantMaxPool2d(kernel_size,
+        #                                               stride,
+        #                                               padding,
+        #                                               dilation,
+        #                                               ceil_mode=ceil_mode,
+        #                                               quant_desc_input = quant_desc.input_desc)
+        #     set_module(model, k, quant_maxpool2d)
+        # elif isinstance(m, nn.AvgPool2d):
+        #     kernel_size = m.kernel_size
+        #     stride = m.stride
+        #     padding = m.padding
+        #     ceil_mode = m.ceil_mode
+        #     count_include_pad = m.count_include_pad
+        #     quant_avgpool2d = quant_nn.AvgPool2d(kernel_size,
+        #                                               stride,
+        #                                               padding,
+        #                                               ceil_mode,
+        #                                               count_include_pad=count_include_pad,
+        #                                               quant_desc_input = quant_desc.input_desc)
+        #     set_module(model, k, quant_avgpool2d)
+        # elif isinstance(m, nn.AdaptiveAvgPool2d):
+        #     output_size = m.output_size
+        #     quant_avgpool2d = quant_nn.AdaptiveAvgPool2d(output_size,
+        #                                               quant_desc_input = quant_desc.input_desc)
+        #     set_module(model, k, quant_avgpool2d)
+        # elif isinstance(m, nn.Linear):
+        #     quant_linear = quant_nn.QuantLinear(
+        #                                     m.in_features,
+        #                                     m.out_features,
+        #                                     quant_desc_input = quant_desc.input_desc,
+        #                                     quant_desc_weight = quant_desc.deconv_weight_desc)
+        #     quant_linear.weight.data.copy_(m.weight.detach())
+        #     if m.bias is not None:
+        #         quant_linear.bias.data.copy_(m.bias.detach())
+        #     else:
+        #         quant_linear.bias = None
+        #     # quant_linear.to(m.weight.device)
+        #     set_module(model, k, quant_linear)
+        # else:
+        #     # module can not be quantized, continue
+        #     continue
     return model
 
 def get_quant_module_map(quant_layers_type=[]):
@@ -221,8 +225,8 @@ def quant_insert_qdq(model, config):
     quant_desc = get_quant_desc(config)
     return insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc)
 
-def quant_model_init(model, config_file, calib_weights=''):
-    config = parse_config(config_file)
+def quant_model_init(model, config, calib_weights=''):
+    # config = parse_config(config_file)
     quant_module_map = get_quant_module_map(config.quant_layers_type)
 
     model = quant_ops_replace(model, config, quant_module_map)
@@ -230,17 +234,23 @@ def quant_model_init(model, config_file, calib_weights=''):
     if calib_weights:
         state_dict = torch.load(calib_weights, map_location='cpu')
         model.load_state_dict(state_dict['model'].state_dict())
-    return model, config
+    return model
 
-def save_calib_model(model_name, model, config):
+def save_calib_model(model_name, model):
     # Save calibrated checkpoint
-    output_model_path = "{}_calib_{}_w{}a{}_{}.pt".format(model_name,
-                                                          config.calib_data_nums,
-                                                          config.w_qscheme.bit,
-                                                          config.a_qscheme.bit,
-                                                          config.a_qscheme.quantizer_type)
-    print('Saving calibrated model to {}... '.format(output_model_path))
-    torch.save({'model': model}, output_model_path)
+    print('Saving calibrated model to {}... '.format(model_name))
+    torch.save({'model': model}, model_name)
+
+def quant_model_calib(model, data_loader, config, batch_size):
+    model.eval()
+    model.cuda()
+    # It is a bit slow since we collect histograms on CPU
+
+    calib_num = min(config.calib_data_nums, len(data_loader.dataset))
+    calib_batch = calib_num // batch_size
+    with torch.no_grad():
+        collect_stats(model, data_loader, calib_batch)
+        compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
 def quant_model_calib_timm(model, data_loader, config, batch_size):
     model.eval()

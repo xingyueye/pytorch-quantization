@@ -38,7 +38,8 @@ from timm.optim import create_optimizer_v2, optimizer_kwargs
 from timm.scheduler import create_scheduler
 from timm.utils import ApexScaler, NativeScaler
 
-from pytorch_quantization.quant_intf import quant_model_init, quant_model_calib_timm, save_calib_model
+# from pytorch_quantization.quant_intf import quant_model_init, quant_model_calib_timm, save_calib_model
+from pytorch_quantization.model_quantizer import TimmModelQuantizer as ModelQuantizer
 
 try:
     from apex import amp
@@ -414,7 +415,9 @@ def main():
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
     if args.quant:
-        model, config = quant_model_init(model, config_file=args.quant_config, calib_weights=args.pretrained_calib)
+        quantizer = ModelQuantizer(model, args.quant_config, calib_weights=args.pretrained_calib, model_name=args.model)
+        model = quantizer.model
+        # model, config = quant_model_init(model, config_file=args.quant_config, calib_weights=args.pretrained_calib)
         # if args.use_lsq:
         #     init_func = lsq_plus_qat_init_model_manu if args.lsq_type=='lsq_plus' else lsq_qat_init_model_manu
         #     init_func(model, args.bit_w, args.bit_a, lsq_type=args.lsq_type)           # using lsq_qat
@@ -631,8 +634,9 @@ def main():
 
     if args.calib:
         if args.local_rank == 0:
-            quant_model_calib_timm(model, loader_train, config, args.batch_size)
-            save_calib_model(args.model, model, config)
+            quantizer.calibration(loader_train, args.batch_size, save_calib_model=True)
+            # quant_model_calib_timm(model, loader_train, config, args.batch_size)
+            # quantizer.save_calib_model(args.model, model, config)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
         return
 
