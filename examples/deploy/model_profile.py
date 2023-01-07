@@ -16,7 +16,7 @@ def prepare_env(args):
     onnx_rmqdq_path = os.path.join(model_zoo_path, 'onnx_rmqdq')
     cache_rmqdq_path = os.path.join(model_zoo_path, 'cache_rmqdq')
     prep_path = os.path.join(model_zoo_path, 'prep')
-    model_file = os.path.join(model_zoo_path, 'partial_quant_collection_{}.txt'.format(sensitivity))
+    model_file = os.path.join(model_zoo_path, 'partial_quant_results.txt')
     profile_file = os.path.join(model_zoo_path, 'partial_quant_profile.txt')
 
     if not os.path.exists(onnx_rmqdq_path):
