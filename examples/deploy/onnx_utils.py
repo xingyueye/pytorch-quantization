@@ -1,3 +1,4 @@
+import glob
 import os.path
 
 import onnx
@@ -293,25 +294,21 @@ def save_calib_cache_file(cache_file, activation_map, headline='TRT-8XXX-Entropy
 if __name__ == '__main__':
 
     onnx_file = sys.argv[1]
-    model = onnx.load(onnx_file)
-    model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
+    if os.path.isdir(onnx_file):
+        onnx_files = glob.glob(onnx_file + '/*.onnx')
+    elif onnx_file.endswith('onnx'):
+        onnx_files = [onnx_file]
+    else:
+        print("{} not supported".format(onnx_file))
+        exit(0)
 
-    onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
-    onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
-    onnx.save(model_wo_qdq, os.path.join(onnx_dir, onnx_new_name))
-    cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
-    save_calib_cache_file(os.path.join(onnx_dir, cache_name), activation_map)
+    for onnx_file in onnx_files:
+        model = onnx.load(onnx_file)
+        model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
 
-
-    # onnx_fuse = onnx_conv_horizon_fuse(model)
-    # onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
-    # onnx_new_name = onnx_name.replace('.onnx', '_fuse_horizon.onnx')
-    # onnx.save(onnx_fuse, os.path.join(onnx_dir, onnx_new_name))
-
-    # onnx_insert = onnx_add_insert_qdqnode(model)
-    # model_wo_qdq, activation_map = onnx_remove_qdqnode(onnx_insert)
-    # onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
-    # onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
-    # onnx.save(onnx_insert, os.path.join(onnx_dir, onnx_new_name))
-    # cache_name = onnx_new_name.replace('.onnx', '_add_insert_qdq_calibration.cache')
-    # save_calib_cache_file(cache_name, activation_map)
+        onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
+        onnx_rmqdq_dir = onnx_dir + "_rmqdq"
+        onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
+        onnx.save(model_wo_qdq, os.path.join(onnx_rmqdq_dir, onnx_new_name))
+        cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
+        save_calib_cache_file(os.path.join(onnx_rmqdq_dir, cache_name), activation_map)
