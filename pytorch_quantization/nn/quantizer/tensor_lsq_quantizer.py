@@ -122,10 +122,10 @@ class LSQTensorQuantizer(TensorQuantizer):
     def _param_init(self,):
         init_weight = self._amax
         value = torch.nn.Parameter(init_weight * 2 / ((2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0) ** 0.5), requires_grad=True)
-        epsilon = 1. / (1 << 24)
-        if value.min() <= epsilon:
-            zero_amax_mask = (value <= epsilon)
-            value.data[zero_amax_mask] = 1.
+        # epsilon = 1. / (1 << 24)
+        # if value.min() <= epsilon:
+        #     zero_amax_mask = (value <= epsilon)
+        #     value.data[zero_amax_mask] = 1.
 
         if hasattr(self, '_scale'):
             self._scale.data = value.data
