@@ -103,7 +103,7 @@ def reduce_amin(input, axis=None, keepdims=True):
                     output.squeeze_()
         return output
 
-def reduce_amax_mean(input, axis=None, keepdims=True):
+def reduce_abs_mean(input, axis=None, keepdims=True):
     """Compute the absolute mean value of a tensor.
 
     Reduces input_tensor along the dimensions given in axis. Unless keepdims is true,

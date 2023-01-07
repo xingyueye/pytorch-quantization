@@ -77,7 +77,7 @@ class LSQCalibrator(_Calibrator):
         for i in range(x.dim()):
             if not i in axis:
                 reduce_axis.append(i)
-        local_amax = quant_utils.reduce_amax_mean(x, axis=reduce_axis).detach()
+        local_amax = quant_utils.reduce_abs_mean(x, axis=reduce_axis).detach()
         if self._calib_amax is None:
             self._calib_amax = local_amax
         else:
@@ -102,7 +102,7 @@ class LSQCalibrator(_Calibrator):
 
     def __repr__(self):
         s = "LSQCalibrator("
-        s += super(MaxCalibrator, self).__repr__()
+        s += super(LSQCalibrator, self).__repr__()
         s += " calib_amax={_calib_amax}"
         s += " track_amax={_track_amax}"
         if self._track_amax:
