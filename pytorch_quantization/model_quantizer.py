@@ -15,9 +15,6 @@ class ModelQuantizer:
             self.ori_model = copy.deepcopy(model)
         self.calib_weights = calib_weights
         self.model_name = model_name
-        self.model = self._init_quant_model(model)
-
-    def _init_quant_model(self, model):
         self.model = quant_model_init(model, self.quant_config, self.calib_weights)
 
     def calibration(self, data_loader, batch_size, save_calib_model=False):
@@ -55,6 +52,8 @@ class ModelQuantizer:
 
 
 class TimmModelQuantizer(ModelQuantizer):
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
+        super(TimmModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
 
     def calibration(self, data_loader, batch_size, save_calib_model=False):
         quant_model_calib_timm(self.model, data_loader, self.quant_config, batch_size)
