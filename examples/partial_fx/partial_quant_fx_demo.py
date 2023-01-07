@@ -325,9 +325,6 @@ def main(args):
     if args.calib_weight is None:
         if not os.path.exists(os.path.join(args.output, 'calib')):
             os.makedirs(os.path.join(args.output, 'calib'))
-    if args.save_partial is True:
-        if not os.path.exists(os.path.join(args.output, 'partial')):
-            os.makedirs(os.path.join(args.output, 'partial'))
     if args.save_onnx is True:
         if not os.path.exists(os.path.join(args.output, 'onnx')):
             os.makedirs(os.path.join(args.output, 'onnx'))
