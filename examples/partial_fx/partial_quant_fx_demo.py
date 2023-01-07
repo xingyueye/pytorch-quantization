@@ -44,6 +44,8 @@ parser.add_argument('--output', type=str, default='./',
 
 parser.add_argument('--quant_config', type=str, default='./partial_config.yaml',
                     help='quantzaiton configuration')
+parser.add_argument('--calib_weight', type=str, default=None,
+                    help='calib weight')
 parser.add_argument('--save_onnx', action='store_true',
                     help='export to onnx')
 
