@@ -63,3 +63,7 @@ python3 partial_quant_fx_demo.py --data ../../../../dataset/ILSVRC2012/  --split
 python3 partial_quant_fx_demo.py --data ../../../../dataset/ILSVRC2012/  --split val --quant_config ./partial_config.yaml \
                                 --model resnext50d_32x4d --pretrained --batch-size 4 --eval-batch-size 50  \
                                 --save_onnx  --output ./timm_pptq_resnet_${DATE}
+
+python3 partial_quant_fx_demo.py --data ../../../../dataset/ILSVRC2012/  --split val --quant_config ./partial_config.yaml \
+                                --model tv_resnest50 --pretrained --batch-size 4 --eval-batch-size 50  \
+                                --save_onnx  --output ./timm_pptq_resnet_${DATE}
