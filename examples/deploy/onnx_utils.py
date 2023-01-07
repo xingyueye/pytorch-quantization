@@ -308,6 +308,9 @@ if __name__ == '__main__':
 
         onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
         onnx_rmqdq_dir = onnx_dir + "_rmqdq"
+        if not os.path.exists(onnx_rmqdq_dir):
+            print("Make dir {}".format(onnx_rmqdq_dir))
+            os.makedirs(onnx_rmqdq_dir)
         onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
         onnx.save(model_wo_qdq, os.path.join(onnx_rmqdq_dir, onnx_new_name))
         cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
