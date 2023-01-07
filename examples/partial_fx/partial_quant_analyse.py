@@ -10,7 +10,7 @@ def partial_analyse(args):
     results_file = 'partial_quant_results.txt'
     cfid = open(os.path.join(args.partial_path, results_file), 'w')
     partial_result_dir = os.path.join(args.partial_path, 'results')
-    partial_result_files = glob.glob(partial_result_dir + '/*.txt')
+    partial_result_files = sorted(glob.glob(partial_result_dir + '/*.txt'))
     for partial_file in partial_result_files:
         if '_ptq.txt' in partial_file:
             with open(partial_file, 'r') as qfid:
