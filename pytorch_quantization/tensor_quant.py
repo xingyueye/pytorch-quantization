@@ -328,6 +328,7 @@ class LSQFakeTensorQuantFunction(Function):
             grad_scale = grad_scale.sum()
         return grad_inputs, grad_scale, None, None, None
 
+# Deprecated, we would remove this part in future
 class StableLSQFakeTensorQuantFunction(Function):
     """A tensor quantization function with learnable scales
 
@@ -376,44 +377,44 @@ class StableLSQFakeTensorQuantFunction(Function):
         outputs, scale = _tensor_quant_scale(inputs, scale, num_bits, unsigned, narrow_range)
         return outputs * scale.to(inputs.dtype)
 
-    @staticmethod
-    def backward(ctx, grad_outputs):
-        """
-        Implements straight through estimation as LSQ. For -amax <= input <= amax
-        the gradient passes straight through, otherwise the gradient is zero.
+#     @staticmethod
+#     def backward(ctx, grad_outputs):
+#         """
+#         Implements straight through estimation as LSQ. For -amax <= input <= amax
+#         the gradient passes straight through, otherwise the gradient is zero.
 
-        Args:
-            ctx: A Context object with saved tensors from forward.
-            grad_outputs: A tensor of gradient of outputs.
+#         Args:
+#             ctx: A Context object with saved tensors from forward.
+#             grad_outputs: A tensor of gradient of outputs.
 
-        Returns:
-            grad_inputs: A tensor of gradient.
-            grad_scale: A tensor of gradient of scale.
-        """
-        inputs, scale, max_bound, min_bound, _grad_scale = ctx.saved_tensors
-        if grad_outputs.dtype == torch.half:
-            max_bound = max_bound.half()
-            min_bound = min_bound.half()
+#         Returns:
+#             grad_inputs: A tensor of gradient.
+#             grad_scale: A tensor of gradient of scale.
+#         """
+#         inputs, scale, max_bound, min_bound, _grad_scale = ctx.saved_tensors
+#         if grad_outputs.dtype == torch.half:
+#             max_bound = max_bound.half()
+#             min_bound = min_bound.half()
 
-        fake_quant_point = inputs / scale
+#         fake_quant_point = inputs / scale
 
-        zero = grad_outputs.new_zeros(1) # create a zero tensor with the same type and device
-        grad_inputs = torch.where((fake_quant_point <= max_bound)*(fake_quant_point >= min_bound), grad_outputs, zero)
+#         zero = grad_outputs.new_zeros(1) # create a zero tensor with the same type and device
+#         grad_inputs = torch.where((fake_quant_point <= max_bound)*(fake_quant_point >= min_bound), grad_outputs, zero)
 
-        grad_scale = -fake_quant_point + fake_quant_point.round()
-        grad_scale = torch.where(grad_scale >= min_bound, grad_scale, min_bound)
-        grad_scale = torch.where(grad_scale <= max_bound, grad_scale, max_bound)
-        grad_scale = grad_scale * grad_outputs
-        if len(scale.size()) > 0:
-            dim = []
-            for i in range(len(scale.size())):
-                if scale.size()[i] == 1:
-                    dim.append(i)
-            grad_scale = grad_scale.sum(dim=dim, keepdim=True)
-        else:
-            grad_scale = grad_scale.sum()
-        grad_scale = 2 * scale * ( grad_scale)
-        return grad_inputs, grad_scale, None, None, None
+#         grad_scale = -fake_quant_point + fake_quant_point.round()
+#         grad_scale = torch.where(grad_scale >= min_bound, grad_scale, min_bound)
+#         grad_scale = torch.where(grad_scale <= max_bound, grad_scale, max_bound)
+#         grad_scale = grad_scale * grad_outputs
+#         if len(scale.size()) > 0:
+#             dim = []
+#             for i in range(len(scale.size())):
+#                 if scale.size()[i] == 1:
+#                     dim.append(i)
+#             grad_scale = grad_scale.sum(dim=dim, keepdim=True)
+#         else:
+#             grad_scale = grad_scale.sum()
+#         grad_scale = 2 * scale * ( grad_scale)
+#         return grad_inputs, grad_scale, None, None, None
 
 class TensorQuantFunction(Function):
     """A universal tensor quantization function
