@@ -415,7 +415,7 @@ def main():
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
     if args.quant:
-        quantizer = ModelQuantizer(model, args.quant_config, calib_weights=args.pretrained_calib, model_name=args.model)
+        quantizer = ModelQuantizer(args.model, model, args.quant_config, calib_weights=args.pretrained_calib)
         model = quantizer.model
         # model, config = quant_model_init(model, config_file=args.quant_config, calib_weights=args.pretrained_calib)
         # if args.use_lsq:
