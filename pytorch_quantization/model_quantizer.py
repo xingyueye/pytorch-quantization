@@ -87,7 +87,7 @@ class TimmModelQuantizer(ModelQuantizer):
 
             return skip_layers, ori_acc, partial_acc, self.quant_config.partial_ptq.sensitivity_method
         else:
-            return 0, ori_acc, ptq_acc, 'None'
+            return [], ori_acc, ptq_acc, 'None'
 
 
 class MMlabModelQuantizer(ModelQuantizer):
