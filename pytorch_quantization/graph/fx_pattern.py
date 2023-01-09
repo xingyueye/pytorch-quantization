@@ -2,7 +2,7 @@ import torch
 from pytorch_quantization import nn as quant_nn
 
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
-           'MeanTypePattern']
+           'MeanTypePattern', 'SEAvgPoolTypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -84,3 +84,20 @@ class DropActDropPathAddTypePattern(torch.nn.Module):
 class MeanTypePattern(torch.nn.Module):
     def forward(self, x):
         return x.mean(dim=(2,3), keepdim=True)
+
+
+"""SEAvgPool Block of FANet"""
+class SEAvgPoolTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.act = quant_nn.QuantAdaptiveAvgPool2d((1,1))
+        self.conv_expand = quant_nn.QuantConv2d(32,32,1)
+        self.bn = torch.nn.BatchNorm2d(32)
+        self.gate = torch.nn.Sigmoid()
+
+    def forward(self, x, identity):
+        x = self.act(x)
+        x = self.conv_expand(x)
+        x = self.bn(x)
+        x = identity * self.gate(x)
+        return x

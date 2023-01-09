@@ -134,6 +134,33 @@ class MeanTypePatternMatcher(PatternMatcher):
                 fx_utils.add_quantizer(node, model_traced, (0,), (mean_quantizer_name,))
 
 
+class SEAvgPoolTypePatternMatcher(PatternMatcher):
+    def __init__(self):
+        super(SEAvgPoolTypePatternMatcher, self).__init__()
+        self.pattern = SEAvgPoolTypePattern()
+        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
+
+    def match_and_insert(self, model_traced, quantizer_desc):
+        for node in model_traced.graph.nodes:
+            if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
+                # Add quantizer to one edge of the residual mul
+                print('node: ', node, node.name, node.args[1].name)
+
+                res_mul_quantizer_name = F"{'.'.join(node.name.split('.'))}._input_quantizer"
+                res_mul_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(res_mul_quantizer_name, res_mul_quantizer)
+                # The matched end node is Mul, whose 1st input we want to add quantizer to
+                fx_utils.add_quantizer(node, model_traced, (0,), (res_mul_quantizer_name,))
+
+                # insert quantizer before sigmoid
+                sigmoid_quantizer_name = F"{'.'.join(node.args[1].name.split('.'))}._input_quantizer"
+                sigmoid_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(sigmoid_quantizer_name, sigmoid_quantizer)
+                # node.args[1] is sigmoid node, whose 1st input we want to add quantizer to
+                fx_utils.add_quantizer(node.args[1], model_traced, (0,), (sigmoid_quantizer_name,))
+
+
 def get_internal_pattern_matcher():
     pattern_matchers = list()
     pattern_matchers.append(ConvBnResReluTypePatternMatcher())
@@ -141,4 +168,5 @@ def get_internal_pattern_matcher():
     pattern_matchers.append(SESiLUTypePatternMatcher())
     pattern_matchers.append(DropActDropPathAddTypePatternMatcher())
     pattern_matchers.append(MeanTypePatternMatcher())
+    pattern_matchers.append(SEAvgPoolTypePatternMatcher())
     return pattern_matchers
