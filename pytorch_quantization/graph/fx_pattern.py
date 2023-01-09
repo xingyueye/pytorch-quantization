@@ -90,13 +90,13 @@ class MeanTypePattern(torch.nn.Module):
 class SEAvgPoolTypePattern(torch.nn.Module):
     def __init__(self,):
         super().__init__()
-        self.act = quant_nn.QuantAdaptiveAvgPool2d((1,1))
+        self.avgpool = quant_nn.QuantAdaptiveAvgPool2d((1,1))
         self.conv_expand = quant_nn.QuantConv2d(32,32,1)
         self.bn = torch.nn.BatchNorm2d(32)
         self.gate = torch.nn.Sigmoid()
 
     def forward(self, x, identity):
-        x = self.act(x)
+        x = self.avgpool(x)
         x = self.conv_expand(x)
         x = self.bn(x)
         x = identity * self.gate(x)
