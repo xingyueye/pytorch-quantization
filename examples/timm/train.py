@@ -37,6 +37,7 @@ from timm.loss import *
 from timm.optim import create_optimizer_v2, optimizer_kwargs
 from timm.scheduler import create_scheduler
 from timm.utils import ApexScaler, NativeScaler
+from torch.nn import functional as F
 
 # from pytorch_quantization.quant_intf import quant_model_init, quant_model_calib_timm, save_calib_model
 from pytorch_quantization.model_quantizer import TimmModelQuantizer as ModelQuantizer
@@ -311,6 +312,15 @@ parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml', hel
 parser.add_argument('--pretrained_calib', type=str, default='', help='Pretrained model')
 parser.add_argument('--export', action='store_true', default=False, help='Enable calibration')
 
+# Distillation parameters
+parser.add_argument('--teacher-model', default='tf_efficientnet_b0', type=str, metavar='MODEL',
+                    help='Name of teacher model to train (default: "tf_efficientnet_b0"')
+parser.add_argument('--teacher-path', type=str, default='')
+parser.add_argument('--distillation-type', default='none', choices=['none', 'soft', 'hard'], type=str, help="")
+parser.add_argument('--distillation-alpha', default=0.5, type=float, help="")
+parser.add_argument('--distillation-tau', default=1.0, type=float, help="")
+parser.add_argument('--distillation-scale', default=1000.0, type=float, help="")
+
 
 def _parse_args():
     # Do we have a config file to parse?
@@ -380,6 +390,26 @@ def main():
 
     if args.fuser:
         set_jit_fuser(args.fuser)
+
+    teacher_model = None
+    if args.distillation_type != 'none':
+        assert args.teacher_path, 'need to specify teacher-path when using distillation'
+        if args.local_rank == 0:
+            _logger.info("Creating teacher model: {}".format(args.teacher_model))
+        teacher_model = create_model(
+            args.teacher_model,
+            pretrained=False,
+            num_classes=args.num_classes,
+            global_pool=args.gp,
+        )
+        resume_checkpoint(
+            teacher_model,
+            args.teacher_path,
+            optimizer=None,
+            loss_scaler=None,
+            log_info=args.local_rank == 0)
+        teacher_model.cuda()
+        teacher_model.eval()
 
     model = create_model(
         args.model,
@@ -631,6 +661,12 @@ def main():
             train_loss_fn = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
     else:
         train_loss_fn = nn.CrossEntropyLoss()
+
+    if args.distillation_type != 'none':
+        train_loss_fn = DistillationLoss(
+            train_loss_fn, teacher_model, args.distillation_type, args.distillation_alpha, args.distillation_tau, args.distillation_scale
+        )
+
     train_loss_fn = train_loss_fn.cuda()
     validate_loss_fn = nn.CrossEntropyLoss().cuda()
 
@@ -747,7 +783,11 @@ def train_one_epoch(
 
         with amp_autocast():
             output = model(input)
-            loss = loss_fn(output, target)
+            if args.distillation_type != 'none':
+                loss, _, distill_loss = loss_fn(input, output, target)
+            else:
+                loss = loss_fn(output, target)
+
 
         if not args.distributed:
             losses_m.update(loss.item(), input.size(0))
@@ -888,6 +928,63 @@ def validate(model, loader, loss_fn, args, amp_autocast=suppress, log_suffix='')
 
     return metrics
 
+
+class DistillationLoss(torch.nn.Module):
+    """
+    This module wraps a standard criterion and adds an extra knowledge distillation loss by
+    taking a teacher model prediction and using it as additional supervision.
+    """
+    def __init__(self, base_criterion: torch.nn.Module, teacher_model: torch.nn.Module,
+                 distillation_type: str, alpha: float, tau: float, scale: float):
+        super().__init__()
+        self.base_criterion = base_criterion
+        self.teacher_model = teacher_model
+        assert distillation_type in ['none', 'soft', 'hard']
+        self.distillation_type = distillation_type
+        self.alpha = alpha
+        self.tau = tau
+        self.scale = scale
+
+    def forward(self, inputs, outputs, labels):
+        """
+        Args:
+            inputs: The original inputs that are feed to the teacher model
+            outputs: the outputs of the model to be trained. It is expected to be
+                either a Tensor, or a Tuple[Tensor, Tensor], with the original output
+                in the first position and the distillation predictions as the second output
+            labels: the labels for the base criterion
+        """
+        # outputs_kd = None
+        # if not isinstance(outputs, torch.Tensor):
+        #    # assume that the model outputs a tuple of [outputs, outputs_kd]
+        #    outputs, outputs_kd = outputs
+        base_loss = self.base_criterion(outputs, labels)
+        if self.distillation_type == 'none':
+            return base_loss, torch.zeros_like(base_loss), torch.zeros_like(base_loss)
+
+        # if outputs_kd is None:
+        #     raise ValueError("When knowledge distillation is enabled, the model is "
+        #                      "expected to return a Tuple[Tensor, Tensor] with the output of the "
+        #                      "class_token and the dist_token")
+        # don't backprop throught the teacher
+        with torch.no_grad():
+            teacher_outputs = self.teacher_model(inputs)
+
+        if self.distillation_type == 'soft':
+            T = self.tau
+            # taken from https://github.com/peterliht/knowledge-distillation-pytorch/blob/master/model/net.py#L100
+            # with slight modifications
+            distillation_loss = F.kl_div(
+                F.log_softmax(outputs / T, dim=1),
+                F.log_softmax(teacher_outputs / T, dim=1),
+                reduction='sum',
+                log_target=True
+            ) * (T * T) / outputs.numel()
+        elif self.distillation_type == 'hard':
+            distillation_loss = F.cross_entropy(outputs, teacher_outputs.argmax(dim=1))
+
+        loss = base_loss * (1 - self.alpha) + distillation_loss * self.alpha * self.scale
+        return loss, base_loss * (1 - self.alpha), distillation_loss * self.alpha * self.scale
 
 if __name__ == '__main__':
     main()
