@@ -25,6 +25,8 @@ parser.add_argument('--batch-size', default=4, type=int,
                     metavar='N', help='mini-batch size (default: 4)')
 parser.add_argument('--num-classes', type=int, default=1000,
                     help='Number classes in dataset (default: 1000)')
+parser.add_argument("--io-dtype", type=str, default='fp16',
+                    help="input/output data precision")
 parser.add_argument('--output', type=str, default='./timm_trt_eval_results.txt',
                     help='output directory of results')
 
@@ -83,7 +85,7 @@ def main(args):
                                     std=data_config['std'],
                                     cropt_pct=data_config['crop_pct'])
 
-        evaluator = Evaluator(engine_path, val_loader, dtype=args.io_datatype)
+        evaluator = Evaluator(engine_path, val_loader, dtype=args.io_type)
         top1, top5, latency, qps = evaluator.evaluate()
         results_txt += "{}:TOP1={:.2f},TOP5={:.2f},LAT={:.2f},QPS={:.2f}\n".format(timm_model, top1, top5, latency, qps)
 
