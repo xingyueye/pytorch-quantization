@@ -25,7 +25,7 @@ parser.add_argument('--batch-size', default=4, type=int,
                     metavar='N', help='mini-batch size (default: 4)')
 parser.add_argument('--num-classes', type=int, default=1000,
                     help='Number classes in dataset (default: 1000)')
-parser.add_argument("--io-dtype", type=str, default='fp16',
+parser.add_argument("--io-type", type=str, default='fp16',
                     help="input/output data precision")
 parser.add_argument('--output', type=str, default='./timm_trt_eval_results.txt',
                     help='output directory of results')
