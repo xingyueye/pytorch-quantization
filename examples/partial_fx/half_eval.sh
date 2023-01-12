@@ -15,6 +15,6 @@ do
   # check suffix is onnx
   if [ "${onnx_file##*.}"x = "onnx"x ]; then
     echo "build ${ONNX_DIR}/${onnx_file}"
-    /usr/local/TensorRT-release/bin/trtexec --streams=1 --workspace=1024 --fp16 --inputIOFormats=fp16:chw --onnx=${ONNX_DIR}/${onnx_file} --saveEngine=${ENGINE_DIR}/${onnx_file%.*}_fp16.trt 2>&1 > ${LOG_DIR}/${onnx_file%.*}_trt_build_log.txt
+    /usr/local/TensorRT-release/bin/trtexec --streams=1 --workspace=1024 --fp16 --inputIOFormats=fp16:chw  --outputIOFormats=fp16:chw --onnx=${ONNX_DIR}/${onnx_file} --saveEngine=${ENGINE_DIR}/${onnx_file%.*}_fp16.trt 2>&1 > ${LOG_DIR}/${onnx_file%.*}_trt_build_log.txt
   fi
 done
