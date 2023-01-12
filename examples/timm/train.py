@@ -309,6 +309,7 @@ parser.add_argument('--quant', action='store_true', default=False, help='Enable 
 parser.add_argument('--calib', action='store_true', default=False, help='Enable calibration')
 parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml', help='Output d irectory to save calibrated model')
 parser.add_argument('--pretrained_calib', type=str, default='', help='Pretrained model')
+parser.add_argument('--export', action='store_true', default=False, help='Enable calibration')
 
 
 def _parse_args():
@@ -416,6 +417,7 @@ def main():
 
     if args.quant:
         quantizer = ModelQuantizer(args.model, model, args.quant_config, calib_weights=args.pretrained_calib)
+        print(model)
         model = quantizer.model
         # model, config = quant_model_init(model, config_file=args.quant_config, calib_weights=args.pretrained_calib)
         # if args.use_lsq:
@@ -638,6 +640,11 @@ def main():
             # quant_model_calib_timm(model, loader_train, config, args.batch_size)
             # quantizer.save_calib_model(args.model, model, config)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
+        return
+
+    if args.export:
+        data_shape = (args.batch_size,) + data_config['input_size']
+        quantizer.export_onnx(data_shape)
         return
 
     # setup checkpoint saver and eval metric tracking
