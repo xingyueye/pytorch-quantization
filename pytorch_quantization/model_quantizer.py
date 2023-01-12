@@ -8,6 +8,15 @@ from pytorch_quantization.quant_intf import *
 from pytorch_quantization.quant_partial import top1_sensitivity, fast_sensitivity, do_partial_quant
 from pytorch_quantization.quant_utils import model_quant_enable, model_quant_disable
 
+def quantable_layers_gather(model):
+    quantable_layers = []
+    for name, module in model.named_modules():
+        if name.endswith("_quantizer"):
+            layer_name = name.replace("._input_quantizer", "").replace("._weight_quantizer", "")
+            if layer_name not in quantable_layers:
+                quantable_layers.append(layer_name)
+    return quantable_layers
+
 class ModelQuantizer:
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
         self.quant_config = parse_config(config)
@@ -88,6 +97,12 @@ class TimmModelQuantizer(ModelQuantizer):
             return skip_layers, ori_acc, partial_acc, self.quant_config.partial_ptq.sensitivity_method
         else:
             return [], ori_acc, ptq_acc, 'None'
+
+    def export_onnx(self, data_shape):
+        onnx_path = self.calib_weights.replace(".pt", "_qat.onnx")
+        quant_model_export(self.model, onnx_path, data_shape)
+        logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
+        remove_qdq_nodes_from_qat_onnx(onnx_path)
 
 
 class MMlabModelQuantizer(ModelQuantizer):
