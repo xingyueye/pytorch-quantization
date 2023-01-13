@@ -61,7 +61,7 @@ def main(args):
     for timm_model in timm_model_list:
         engine_path = None
         for engine in trt_engines:
-            if timm_model + "_" in engine:
+            if os.path.basename(engine).startswith(timm_model + '_'):
                 engine_path = engine
                 break
         if engine_path is None:
