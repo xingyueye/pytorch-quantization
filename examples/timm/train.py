@@ -416,7 +416,7 @@ def main():
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
     if args.quant:
-        quantizer = ModelQuantizer(args.model, model, args.quant_config, calib_weights=args.pretrained_calib)
+        quantizer = ModelQuantizer(args.model, model, args.quant_config, calib_weights='' if args.calib else args.pretrained_calib)
         print(model)
         model = quantizer.model
         # model, config = quant_model_init(model, config_file=args.quant_config, calib_weights=args.pretrained_calib)
@@ -882,6 +882,9 @@ def validate(model, loader, loss_fn, args, amp_autocast=suppress, log_suffix='')
                         loss=losses_m, top1=top1_m, top5=top5_m))
 
     metrics = OrderedDict([('loss', losses_m.avg), ('top1', top1_m.avg), ('top5', top5_m.avg)])
+
+    _logger.info(' * Acc@1 {:.3f} Acc@5 {:.3f} '.format(
+       metrics['top1'], metrics['top5']))
 
     return metrics
 

@@ -8,3 +8,4 @@ pytest-runner
 huggingface_hub
 easydict
 tabulate
+onnx
