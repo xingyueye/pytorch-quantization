@@ -83,7 +83,7 @@ class LinearConverter(Converter):
                                     module.in_features,
                                     module.out_features,
                                     quant_desc_input = self.quant_desc.input_desc,
-                                    quant_desc_weight = self.quant_desc.deconv_weight_desc)
+                                    quant_desc_weight = self.quant_desc.conv_weight_desc)
         quant_linear.weight.data.copy_(module.weight.detach())
         if module.bias is not None:
             quant_linear.bias.data.copy_(module.bias.detach())
