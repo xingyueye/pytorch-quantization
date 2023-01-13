@@ -1,22 +1,24 @@
 # tv_renset50
 # calib
-CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
-                                    --master_port 12346 train.py  \
-                                    /mnt/dolphinfs/hdd_pool/docker/user/hadoop-hdpmlpserving/liqingyuan02/dataset/ILSVRC2012 \
+# IMAGENET='/mnt/dolphinfs/hdd_pool/docker/user/hadoop-hdpmlpserving/liqingyuan02/dataset/ILSVRC2012'
+IMAGENET='/mnt/dolphinfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012'
+CUDA_VISIBLE_DEVICES=2  python3 -m torch.distributed.launch --nproc_per_node 1 \
+                                    --master_port 12346 examples/timm/train.py  \
+                                    $IMAGENET \
                                     -b 32 \
                                     --model tv_resnet50 \
                                     --quant \
                                     --calib \
-                                    --quant_config configs/mpq_config_r50_4bit_stable_lsq.yaml \
+                                    --quant_config examples/timm/configs/mpq_config_r50_8bit_stable_lsq.yaml \
                                     --pretrained \
                                     --val-split val
 # qat
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc_per_node 8 \
-                                    --master_port 12346 train.py  \
-                                    /mnt/dolphinfs/hdd_pool/docker/user/hadoop-hdpmlpserving/liqingyuan02/dataset/ILSVRC2012 \
+                                    --master_port 12346 examples/timm/train.py  \
+                                    $IMAGENET \
                                     --model tv_resnet50 \
                                     --quant \
-                                    --quant_config configs/mpq_config_r50_4bit_stable_lsq.yaml \
+                                    --quant_config examples/timm/configs/mpq_config_r50_4bit_stable_lsq.yaml \
                                     --pretrained_calib tv_resnet50_calib_128_w4a4_stable_lsq.pt \
                                     -b 64 \
                                     --sched cosine \
@@ -34,22 +36,22 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc
 # resnet18
 # calib
 CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
-                                    --master_port 12346 train.py  \
-                                    /mnt/dolphinfs/hdd_pool/docker/user/hadoop-hdpmlpserving/liqingyuan02/dataset/ILSVRC2012 \
+                                    --master_port 12346 examples/timm/train.py  \
+                                    $IMAGENET \
                                     -b 32 \
                                     --model resnet18 \
                                     --quant \
                                     --calib \
-                                    --quant_config configs/mpq_config_r18_4bit_stable_lsq.yaml \
+                                    --quant_config examples/timm/configs/mpq_config_r18_4bit_stable_lsq.yaml \
                                     --pretrained \
                                     --val-split val
 # qat
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc_per_node 8 \
-                                    --master_port 12346 train.py  \
-                                    /mnt/dolphinfs/hdd_pool/docker/user/hadoop-hdpmlpserving/liqingyuan02/dataset/ILSVRC2012 \
+                                    --master_port 12346 examples/timm/train.py  \
+                                    $IMAGENET \
                                     --model resnet18 \
                                     --quant \
-                                    --quant_config configs/mpq_config_r18_4bit_stable_lsq.yaml \
+                                    --quant_config examples/timm/configs/mpq_config_r18_4bit_stable_lsq.yaml \
                                     --pretrained_calib resnet18_calib_128_w4a4_stable_lsq.pt \
                                     -b 64 \
                                     --sched cosine \

@@ -4,3 +4,7 @@ scipy
 sphinx_glpi_theme
 prettytable
 pyyaml
+pytest-runner
+huggingface_hub
+easydict
+tabulate
