@@ -48,7 +48,7 @@ timm_model_list = [
     'resnetrs270',
     'resnext50_32x4d',
     'resnext50d_32x4d',
-    'tv_resnet50'
+    'tv_resnet50',
     'efficientnet_b0',
     'efficientnet_b1',
     'efficientnet_b2',
