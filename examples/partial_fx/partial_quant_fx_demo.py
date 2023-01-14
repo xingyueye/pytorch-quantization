@@ -337,7 +337,7 @@ def main(args):
 
     if len(skip_layers) > 0:
         suffix = "{}_pptq".format(sensitivity)
-        write_results(os.path.join(os.path.join(args.output, 'results'), args.model + "_{}.txt".format(sensitivity)),
+        write_results(os.path.join(os.path.join(args.output, 'results'), args.model + "_{}.txt".format(suffix)),
                       args.model,
                       ori_acc1,
                       partial_acc1,
