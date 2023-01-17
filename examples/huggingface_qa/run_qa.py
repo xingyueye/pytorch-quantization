@@ -90,7 +90,7 @@ class ModelArguments:
         default=4,
         metadata={"help": "Number of batches for calibration. 0 will disable calibration "},
     )
-
+    save_onnx: bool = field(default=False, metadata={"help": "Whether to save model to onnx."})
 
 @dataclass
 class QuantArguments:
@@ -102,7 +102,6 @@ class QuantArguments:
     pretrained_calib: Optional[str] = field(default='', metadata={"help": "Calibrated pretrained model."})
     do_calib: bool = field(default=False, metadata={"help": "Whether to run calibration of quantization ranges."})
     do_qat: bool = field(default=False, metadata={"help": "Whether to run Quantization Aware Training."})
-    save_onnx: bool = field(default=False, metadata={"help": "Whether to save model to onnx."})
 
 @dataclass
 class DataTrainingArguments:
@@ -340,7 +339,7 @@ def main():
 
     # Preprocessing the datasets.
     # Preprocessing is slighlty different for training and evaluation.
-    if training_args.do_train or model_args.do_calib:
+    if training_args.do_train or quant_trainer_args.do_calib:
         column_names = raw_datasets["train"].column_names
     elif training_args.do_eval or model_args.save_onnx:
         column_names = raw_datasets["validation"].column_names
@@ -433,7 +432,7 @@ def main():
 
         return tokenized_examples
 
-    if training_args.do_train or model_args.do_calib:
+    if training_args.do_train or quant_trainer_args.do_calib:
         if "train" not in raw_datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = raw_datasets["train"]
@@ -598,7 +597,7 @@ def main():
     )
 
     # Calibration
-    if model_args.do_calib:
+    if quant_trainer_args.do_calib:
         logger.info("*** Calibrate ***")
         results = trainer.calibrate()
         trainer.save_model()

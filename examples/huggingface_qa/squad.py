@@ -47,7 +47,8 @@ articles, where the answer to every question is a segment of text, or span, \
 from the corresponding reading passage, or the question might be unanswerable.
 """
 
-_URL = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
+# _URL = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
+_URL = "./SQuAD1.1/"
 _URLS = {
     "train": _URL + "train-v1.1.json",
     "dev": _URL + "dev-v1.1.json",
