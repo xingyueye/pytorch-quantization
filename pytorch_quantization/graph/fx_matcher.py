@@ -310,7 +310,7 @@ class BERTPatternMatcher(InstPatternMatcher):
 
 class PatternMatcherFactory(object):
     @classmethod
-    def get_pattern_matcher(self, type_str):
+    def get_pattern_matcher(cls, type_str):
         return eval("{}PatternMatcher".format(type_str))()
 
 

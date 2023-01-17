@@ -58,10 +58,9 @@ def parse_config(config_file):
         config = yaml.load(f, Loader=yaml.FullLoader)
     return EasyDict(config)
 
-def collect_stats(model, data_loader, num_batches):
-    """Feed data to the network and collect statistic"""
 
-    # Enable calibrators
+def enable_calibration(model):
+    """Enable calibration of all *_input_quantizer modules in model."""
     for name, module in model.named_modules():
         if isinstance(module, quant_nn.TensorQuantizer):
             if module._calibrator is not None:
@@ -70,13 +69,8 @@ def collect_stats(model, data_loader, num_batches):
             else:
                 module.disable()
 
-    for i, (image, _) in tqdm(enumerate(data_loader), total=num_batches):
-        # image = image.float()/255.0
-        model(image.cuda())
-        if i >= num_batches:
-            break
 
-    # Disable calibrators
+def disable_calibration(model):
     for name, module in model.named_modules():
         if isinstance(module, quant_nn.TensorQuantizer):
             if module._calibrator is not None:
@@ -84,6 +78,49 @@ def collect_stats(model, data_loader, num_batches):
                 module.disable_calib()
             else:
                 module.enable()
+
+
+def _internal_predict(model, data_loader, num_batches):
+    for i, (image, _) in tqdm(enumerate(data_loader), total=num_batches):
+        # image = image.float()/255.0
+        model(image.cuda())
+        if i >= num_batches:
+            break
+
+def collect_stats(model, data_loader, num_batches, predict):
+    """Feed data to the network and collect statistic"""
+
+    # Enable calibrators
+    # for name, module in model.named_modules():
+    #     if isinstance(module, quant_nn.TensorQuantizer):
+    #         if module._calibrator is not None:
+    #             module.disable_quant()
+    #             module.enable_calib()
+    #         else:
+    #             module.disable()
+    enable_calibration(model)
+
+    if predict is None:
+        _internal_predict(model, data_loader, num_batches)
+    else:
+        predict(model, data_loader, num_batches)
+    # for i, (image, _) in tqdm(enumerate(data_loader), total=num_batches):
+    #     # image = image.float()/255.0
+    #     model(image.cuda())
+    #     if i >= num_batches:
+    #         break
+
+    predict(model, data_loader, num_batches)
+    # Disable calibrators
+    # for name, module in model.named_modules():
+    #     if isinstance(module, quant_nn.TensorQuantizer):
+    #         if module._calibrator is not None:
+    #             module.enable_quant()
+    #             module.disable_calib()
+    #         else:
+    #             module.enable()
+    disable_calibration(model)
+
 
 def compute_amax(model, **kwargs):
     # Load Calib result
@@ -98,6 +135,7 @@ def compute_amax(model, **kwargs):
                     module.load_calib_amax(**kwargs)
             print(F"{name:40}: {module}")
     model.cuda()
+
 
 def get_quant_desc(config):
     quant_desc = {
@@ -258,7 +296,7 @@ def save_calib_model(model_name, model):
     print('Saving calibrated model to {}... '.format(model_name))
     torch.save({'model': model}, model_name)
 
-def quant_model_calib(model, data_loader, config, batch_size):
+def quant_model_calib(model, data_loader, config, batch_size, predict):
     model.eval()
     model.cuda()
     # It is a bit slow since we collect histograms on CPU
@@ -266,10 +304,10 @@ def quant_model_calib(model, data_loader, config, batch_size):
     calib_num = min(config.calib_data_nums, len(data_loader.dataset))
     calib_batch = calib_num // batch_size
     with torch.no_grad():
-        collect_stats(model, data_loader, calib_batch)
+        collect_stats(model, data_loader, calib_batch, predict)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
-def quant_model_calib_timm(model, data_loader, config, batch_size):
+def quant_model_calib_timm(model, data_loader, config, batch_size, predict):
     model.eval()
     model.cuda()
     # It is a bit slow since we collect histograms on CPU
@@ -277,7 +315,18 @@ def quant_model_calib_timm(model, data_loader, config, batch_size):
     calib_num = min(config.calib_data_nums, len(data_loader.dataset))
     calib_batch = calib_num // batch_size
     with torch.no_grad():
-        collect_stats(model, data_loader, calib_batch)
+        collect_stats(model, data_loader, calib_batch, predict)
+        compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
+
+def quant_model_calib_bert(model, data_loader, config, batch_size, predict):
+    model.eval()
+    model.cuda()
+    # It is a bit slow since we collect histograms on CPU
+
+    calib_num = min(config.calib_data_nums, len(data_loader.dataset))
+    calib_batch = calib_num // batch_size
+    with torch.no_grad():
+        collect_stats(model, data_loader, calib_batch, predict)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
 def quant_model_export(model, onnx_path, data_shape):

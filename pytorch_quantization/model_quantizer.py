@@ -29,9 +29,9 @@ class ModelQuantizer:
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init(model, config, calib_weights, type_str='CNN', do_trace=True)
 
-    def calibration(self, data_loader, batch_size, save_calib_model=False):
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
         try:
-            quant_model_calib(self.model, data_loader, self.quant_config, batch_size)
+            quant_model_calib(self.model, data_loader, self.quant_config, batch_size, custom_predict)
         except:
             raise NotImplementedError("The dataloader format of unknown plateform need to be support independently")
 
@@ -67,8 +67,9 @@ class TimmModelQuantizer(ModelQuantizer):
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
         super(TimmModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
 
-    def calibration(self, data_loader, batch_size, save_calib_model=False):
-        quant_model_calib_timm(self.model, data_loader, self.quant_config, batch_size)
+
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
+        quant_model_calib_timm(self.model, data_loader, self.quant_config, batch_size, custom_predict)
         if save_calib_model:
             self._save_calib_weights()
 
@@ -125,3 +126,8 @@ class BERTModelQuantizer(ModelQuantizer):
         input_names = ["input_ids", "attention_mask", "token_type_ids"]
         bert_traced_model = symbolic_trace(model, input_names=input_names)
         return quant_model_init(bert_traced_model, config, calib_weights, type_str='BERT', do_trace=False)
+
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
+        quant_model_calib_bert(self.model, data_loader, self.quant_config, batch_size, custom_predict)
+        if save_calib_model:
+            self._save_calib_weights()
