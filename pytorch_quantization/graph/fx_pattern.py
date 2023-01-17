@@ -2,7 +2,8 @@ import torch
 from pytorch_quantization import nn as quant_nn
 
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
-           'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern']
+           'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern', 'BERTQueryKeyTypePattern', 'BERTAttnOutTypePattern',
+           'BERTResAddTypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -102,6 +103,7 @@ class SEAvgPoolTypePattern(torch.nn.Module):
         x = identity * self.gate(x)
         return x
 
+
 """HardSigmoid Block of MobileNetV3"""
 class HardSigmoidTypePattern(torch.nn.Module):
     def __init__(self,):
@@ -110,4 +112,40 @@ class HardSigmoidTypePattern(torch.nn.Module):
 
     def forward(self, x, identity):
         x = identity * self.gate(x)
+        return x
+
+"""QueryKey of Huggingface BERT"""
+class BERTQueryKeyTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, q, k):
+        q = q.permute(0,2,1,3)
+        x = torch.matmul(q, k.transpose(-1,-2))
+        return x
+
+"""AttnOut of Hugginface BERT"""
+class BERTAttnOutTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.softmax = torch.nn.Softmax(dim=-1)
+        self.dropout = torch.nn.Dropout()
+
+    def forward(self, qk, v_trans):
+        x = self.softmax(qk)
+        x = self.dropout(x)
+        x = torch.matmul(x, v_trans)
+        return x
+
+"""ResAdd of Hugginface BERT"""
+class BERTResAddTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.dense = quant_nn.QuantLinear(32,32)
+        self.dropout = torch.nn.Dropout()
+
+    def forward(self, x, identity):
+        x = self.dense(x)
+        x = self.dropout(x)
+        x = x + identity
         return x

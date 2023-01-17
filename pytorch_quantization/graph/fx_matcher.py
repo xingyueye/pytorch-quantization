@@ -160,12 +160,12 @@ class SEAvgPoolTypePatternMatcher(PatternMatcher):
                 # node.args[1] is sigmoid node, whose 1st input we want to add quantizer to
                 fx_utils.add_quantizer(node.args[1], model_traced, (0,), (sigmoid_quantizer_name,))
 
+
 class HardSigmoidTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(HardSigmoidTypePatternMatcher, self).__init__()
         self.pattern = HardSigmoidTypePattern()
         self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
-        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
         for node in model_traced.graph.nodes:
@@ -186,6 +186,7 @@ class HardSigmoidTypePatternMatcher(PatternMatcher):
                 # node.args[1] is sigmoid node, whose 1st input we want to add quantizer to
                 fx_utils.add_quantizer(node.args[1], model_traced, (0,), (hardsigmoid_quantizer_name,))
 
+
 def get_internal_pattern_matcher():
     pattern_matchers = list()
     pattern_matchers.append(ConvBnResReluTypePatternMatcher())
@@ -195,4 +196,121 @@ def get_internal_pattern_matcher():
     pattern_matchers.append(MeanTypePatternMatcher())
     pattern_matchers.append(SEAvgPoolTypePatternMatcher())
     pattern_matchers.append(HardSigmoidTypePatternMatcher())
+
+class BERTQueryKeyTypePatternMatcher(PatternMatcher):
+    def __init__(self):
+        super(BERTQueryKeyTypePatternMatcher, self).__init__()
+        self.pattern = BERTQueryKeyTypePattern()
+        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph.print_tabular()
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
+
+    def match_and_insert(self, model_traced, quantizer_desc):
+        for node in model_traced.graph.nodes:
+            if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
+                # Add quantizers to two input branches
+                print('node: ', node, node.name, node.args[0].name, node.args[1].name)
+
+                query_quantizer_name = F"{'.'.join(node.name.split('.'))}_query._input_quantizer"
+                query_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(query_quantizer_name, query_quantizer)
+                key_quantizer_name = F"{'.'.join(node.name.split('.'))}_key._input_quantizer"
+                key_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(query_quantizer_name, query_quantizer)
+                model_traced.add_submodule(key_quantizer_name, key_quantizer)
+
+                fx_utils.add_quantizer(node, model_traced, [0, 1], [query_quantizer_name, key_quantizer_name])
+
+class BERTAttnOutTypePatternMatcher(PatternMatcher):
+    def __init__(self):
+        super(BERTAttnOutTypePatternMatcher, self).__init__()
+        self.pattern = BERTAttnOutTypePattern()
+        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph.print_tabular()
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
+
+    def match_and_insert(self, model_traced, quantizer_desc):
+        for node in model_traced.graph.nodes:
+            if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
+                # Add quantizer to two input branches
+                print('node: ', node, node.name, node.args[0].name, node.args[1].name)
+
+                attn_quantizer_name = F"{'.'.join(node.name.split('.'))}_attn._input_quantizer"
+                attn_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(attn_quantizer_name, attn_quantizer)
+                value_quantizer_name = F"{'.'.join(node.name.split('.'))}_value._input_quantizer"
+                value_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(attn_quantizer_name, attn_quantizer)
+                model_traced.add_submodule(value_quantizer_name, value_quantizer)
+
+                fx_utils.add_quantizer(node, model_traced, [0, 1], [attn_quantizer_name, value_quantizer_name])
+
+
+class BERTResAddTypePatternMatcher(PatternMatcher):
+    def __init__(self):
+        super(BERTResAddTypePatternMatcher, self).__init__()
+        self.pattern = BERTResAddTypePattern()
+        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph.print_tabular()
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
+
+    def match_and_insert(self, model_traced, quantizer_desc):
+        for node in model_traced.graph.nodes:
+            if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
+                # Add quantizer to identity branch
+                print('node: ', node, node.name, node.args[0].name, node.args[1].name)
+
+                out_quantizer_name = F"{'.'.join(node.name.split('.'))}_out._input_quantizer"
+                out_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(out_quantizer_name, out_quantizer)
+
+                res_quantizer_name = F"{'.'.join(node.name.split('.'))}_res._input_quantizer"
+                res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(res_quantizer_name, res_quantizer)
+
+                fx_utils.add_quantizer(node, model_traced, [0, 1], [out_quantizer_name, res_quantizer_name])
+
+
+def get_internal_pattern_matcher():
+    pattern_matchers = list()
+    # pattern_matchers.append(ConvBnResReluTypePatternMatcher())
+    # pattern_matchers.append(SEReLUTypePatternMatcher())
+    # pattern_matchers.append(SESiLUTypePatternMatcher())
+    # pattern_matchers.append(DropActDropPathAddTypePatternMatcher())
+    # pattern_matchers.append(MeanTypePatternMatcher())
+    # pattern_matchers.append(SEAvgPoolTypePatternMatcher())
+    pattern_matchers.append(BERTQueryKeyTypePatternMatcher())
+    pattern_matchers.append(BERTAttnOutTypePatternMatcher())
+    pattern_matchers.append(BERTResAddTypePatternMatcher())
     return pattern_matchers
+
+class InstPatternMatcher(object):
+    def __init__(self):
+        self.pattern_matchers = list()
+
+    def get_pattern_matchers(self):
+        return self.pattern_matchers
+
+class CNNPatternMatcher(InstPatternMatcher):
+    def __init__(self):
+        super().__init__()
+        self.pattern_matchers.append(ConvBnResReluTypePatternMatcher())
+        self.pattern_matchers.append(SEReLUTypePatternMatcher())
+        self.pattern_matchers.append(SESiLUTypePatternMatcher())
+        self.pattern_matchers.append(DropActDropPathAddTypePatternMatcher())
+        self.pattern_matchers.append(MeanTypePatternMatcher())
+        self.pattern_matchers.append(SEAvgPoolTypePatternMatcher())
+
+class BERTPatternMatcher(InstPatternMatcher):
+    def __init__(self):
+        super().__init__()
+        self.pattern_matchers.append(BERTQueryKeyTypePatternMatcher())
+        self.pattern_matchers.append(BERTAttnOutTypePatternMatcher())
+        self.pattern_matchers.append(BERTResAddTypePatternMatcher())
+
+class PatternMatcherFactory(object):
+    @classmethod
+    def get_pattern_matcher(self, type_str):
+        return eval("{}PatternMatcher".format(type_str))()
+
+

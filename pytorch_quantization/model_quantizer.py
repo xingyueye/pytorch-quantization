@@ -24,7 +24,10 @@ class ModelQuantizer:
             self.ori_model = copy.deepcopy(model)
         self.calib_weights = calib_weights
         self.model_name = model_name
-        self.model = quant_model_init(model, self.quant_config, self.calib_weights)
+        self.model = self._quant_model_init(model, self.quant_config, self.calib_weights)
+
+    def _quant_model_init(self, model, config, calib_weights):
+        return quant_model_init(model, config, calib_weights, type_str='CNN', do_trace=True)
 
     def calibration(self, data_loader, batch_size, save_calib_model=False):
         try:
@@ -111,3 +114,14 @@ class MMlabModelQuantizer(ModelQuantizer):
     #     quant_model_calib_mmlab(self.model, data_loader, self.quant_config, batch_size)
     #     if save_calib_model:
     #         self._save_calib_weights()
+
+
+class BERTModelQuantizer(ModelQuantizer):
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
+        super(BERTModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+
+    def _quant_model_init(self, model, config, calib_weights):
+        from transformers.utils.fx import symbolic_trace
+        input_names = ["input_ids", "attention_mask", "token_type_ids"]
+        bert_traced_model = symbolic_trace(model, input_names=input_names)
+        return quant_model_init(bert_traced_model, config, calib_weights, type_str='BERT', do_trace=False)

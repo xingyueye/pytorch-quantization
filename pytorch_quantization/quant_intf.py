@@ -223,20 +223,35 @@ def get_quant_module_map(quant_layers_type=[]):
         quant_map = {k:_DEFAULT_QUANT_MAP[k] for k in quant_layers_type if k in _DEFAULT_QUANT_MAP}
         return quant_map
 
-def quant_insert_qdq(model, config):
+def quant_insert_qdq(model, config, type_str='CNN', do_trace=True):
     quant_desc = get_quant_desc(config)
-    return insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc)
+    return insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc, type_str, do_trace)
 
-def quant_model_init(model, config, calib_weights=''):
+def quant_model_init(model, config, calib_weights='', type_str='CNN', do_trace=True):
     # config = parse_config(config_file)
     quant_module_map = get_quant_module_map(config.quant_layers_type)
 
     model = quant_ops_replace(model, config, quant_module_map)
-    model = quant_insert_qdq(model, config)
+    model = quant_insert_qdq(model, config, type_str, do_trace)
     if calib_weights:
         state_dict = torch.load(calib_weights, map_location='cpu')
         model.load_state_dict(state_dict['model'].state_dict())
     return model
+
+# def bert_quant_insert_qdq(model, config):
+#     quant_desc = get_quant_desc(config)
+#     return bert_insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc)
+#
+# def bert_quant_model_init(model, config, calib_weights=''):
+#     # config = parse_config(config_file)
+#     quant_module_map = get_quant_module_map(config.quant_layers_type)
+#
+#     model = quant_ops_replace(model, config, quant_module_map)
+#     model = bert_quant_insert_qdq(model, config)
+#     if calib_weights:
+#         state_dict = torch.load(calib_weights, map_location='cpu')
+#         model.load_state_dict(state_dict['model'].state_dict())
+#     return model
 
 def save_calib_model(model_name, model):
     # Save calibrated checkpoint

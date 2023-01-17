@@ -162,6 +162,8 @@ class LowerQuantOpTracer(fx.Tracer):
             return True
         if isinstance(m, (quant_nn.QuantAdaptiveAvgPool1d, quant_nn.QuantAdaptiveAvgPool2d, quant_nn.QuantAdaptiveAvgPool3d)):
             return True
+        if isinstance(m, nn.Softmax):
+            return False
         return super().is_leaf_module(m, qualname)
 
 
