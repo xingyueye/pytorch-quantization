@@ -99,6 +99,24 @@ class LSTMCellConverter(Converter):
     pass
 
 
+class MaxPool1dConverter(Converter):
+    def convert(self, module):
+        kernel_size = module.kernel_size
+        stride = module.stride
+        padding = module.padding
+        dilation = module.dilation
+        ceil_mode = module.ceil_mode
+        return_indices = module.return_indices
+        quant_maxpool1d = quant_nn.QuantMaxPool1d(kernel_size,
+                                                    stride,
+                                                    padding,
+                                                    dilation,
+                                                    ceil_mode=ceil_mode,
+                                                    return_indices=return_indices,
+                                                    quant_desc_input = self.quant_desc.input_desc)
+
+        return quant_maxpool1d
+
 class MaxPool2dConverter(Converter):
     def convert(self, module):
         kernel_size = module.kernel_size
@@ -117,11 +135,24 @@ class MaxPool2dConverter(Converter):
 
         return quant_maxpool2d
 
-class MaxPool1dConverter(MaxPool2dConverter):
-    pass
 
-class MaxPool3dConverter(MaxPool2dConverter):
-    pass
+class MaxPool3dConverter(Converter):
+    def convert(self, module):
+        kernel_size = module.kernel_size
+        stride = module.stride
+        padding = module.padding
+        dilation = module.dilation
+        ceil_mode = module.ceil_mode
+        return_indices = module.return_indices
+        quant_maxpool3d = quant_nn.QuantMaxPool3d(kernel_size,
+                                                    stride,
+                                                    padding,
+                                                    dilation,
+                                                    ceil_mode=ceil_mode,
+                                                    return_indices=return_indices,
+                                                    quant_desc_input = self.quant_desc.input_desc)
+
+        return quant_maxpool3d
 
 
 class AvgPool1dConverter(Converter):
@@ -131,7 +162,7 @@ class AvgPool1dConverter(Converter):
         padding = module.padding
         ceil_mode = module.ceil_mode
         count_include_pad = module.count_include_pad
-        quant_avgpool1d = quant_nn.QuantAvgPool2d(kernel_size,
+        quant_avgpool1d = quant_nn.QuantAvgPool1d(kernel_size,
                                                     stride,
                                                     padding,
                                                     ceil_mode,
@@ -159,8 +190,30 @@ class AvgPool2dConverter(Converter):
         return quant_avgpool2d
 
 
-class AvgPool3dConverter(AvgPool2dConverter):
-    pass
+class AvgPool3dConverter(Converter):
+    def convert(self, module):
+        kernel_size = module.kernel_size
+        stride = module.stride
+        padding = module.padding
+        ceil_mode = module.ceil_mode
+        count_include_pad = module.count_include_pad
+        divisor_override = module.divisor_override
+        quant_avgpool3d = quant_nn.QuantAvgPool3d(kernel_size,
+                                                    stride,
+                                                    padding,
+                                                    ceil_mode,
+                                                    count_include_pad=count_include_pad,
+                                                    divisor_override=divisor_override,
+                                                    quant_desc_input = self.quant_desc.input_desc)
+
+        return quant_avgpool3d
+
+class AdaptiveAvgPool1dConverter(Converter):
+    def convert(self, module):
+        output_size = module.output_size
+        quant_avgpool1d = quant_nn.QuantAdaptiveAvgPool1d(output_size,
+                                                    quant_desc_input = self.quant_desc.input_desc)
+        return quant_avgpool1d
 
 
 class AdaptiveAvgPool2dConverter(Converter):
@@ -171,9 +224,9 @@ class AdaptiveAvgPool2dConverter(Converter):
         return quant_avgpool2d
 
 
-class AdaptiveAvgPool1dConverter(AdaptiveAvgPool2dConverter):
-    pass
-
-
-class AdaptiveAvgPool3dConverter(AdaptiveAvgPool2dConverter):
-    pass
+class AdaptiveAvgPool3dConverter(Converter):
+    def convert(self, module):
+        output_size = module.output_size
+        quant_avgpool3d = quant_nn.QuantAdaptiveAvgPool3d(output_size,
+                                                    quant_desc_input = self.quant_desc.input_desc)
+        return quant_avgpool3d
