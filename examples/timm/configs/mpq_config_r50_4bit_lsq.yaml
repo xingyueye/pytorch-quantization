@@ -6,7 +6,7 @@ w_qscheme:
     symmetry: True                  # default symmetry for TRT
     per_channel: True               # default per_channle for weights
     calib_method: "lsq"             # default 'max' for weights calibration
-    percentile: 0.99                # used for histogram calibration
+    percentile: 99.99                # used for histogram calibration
 
 a_qscheme:
     quantizer_type: "lsq"    # tensor-quantizer type
@@ -14,7 +14,7 @@ a_qscheme:
     symmetry: True
     per_channel: False          # default per_tensor for weights
     calib_method: "lsq"   # default 'histogram' for activation calibration
-    percentile: 0.99            # used for histogram calibration
+    percentile: 99.99            # used for histogram calibration
     hist_method: 'none'      # 'entropy', 'percentile', 'mse', 'none'
 
 calib_data_nums: 128            # total number of data used to calibrate the model
