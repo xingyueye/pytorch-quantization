@@ -45,10 +45,10 @@ class QuestionAnsweringTrainer(Trainer):
         self.quant_trainer_args = quant_trainer_args
         self.calib_num = 128  # default number of calibration samples
         self.quantizer = BERTModelQuantizer("BERT_QA",
-                                        self.model.bert,
+                                        self.model,
                                         self.quant_trainer_args.quant_config,
                                         self.quant_trainer_args.pretrained_calib)
-        self.model.bert = self.quantizer.model
+        self.model = self.quantizer.model
 
     def get_calib_dataloader(self, calib_dataset=None):
         """
@@ -85,7 +85,7 @@ class QuestionAnsweringTrainer(Trainer):
         calib_dataloader = self.get_calib_dataloader(calib_dataset)
         self.quantizer.calibration(calib_dataloader,
                                    calib_dataloader.batch_size,
-                                   save_calib_model=False,
+                                   save_calib_model=True,
                                    custom_predict=self.calib_predict)
 
         # model = self.model
@@ -105,52 +105,52 @@ class QuestionAnsweringTrainer(Trainer):
         #
         # quant_trainer.finish_calibration(model, self.quant_trainer_args)
         # self.model = model
-    # def compute_loss(self, model, inputs, return_outputs=False):
-    #     """
-    #     How the loss is computed by Trainer. By default, all models return the loss in the first element.
-    #
-    #     Subclass and override for custom behavior.
-    #     """
-    #     if self.label_smoother is not None and "labels" in inputs:
-    #         labels = inputs.pop("labels")
-    #     else:
-    #         labels = None
-    #     outputs = model(**inputs)
-    #
-    #     # # Save past state if it exists
-    #     # # TODO: this needs to be fixed and made cleaner later.
-    #     # if self.args.past_index >= 0:
-    #     #     self._past = outputs[self.args.past_index]
-    #     #
-    #     # if labels is not None:
-    #     #     loss = self.label_smoother(outputs, labels)
-    #     # else:
-    #     #     # We don't use .loss here since the model may return tuples instead of ModelOutput.
-    #     #     loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-    #     #
-    #     # return (loss, outputs) if return_outputs else loss
-    #     start_positions = inputs['start_positions']
-    #     end_positions = inputs['end_positions']
-    #     start_logits = outputs['start_logits']
-    #     end_logits = outputs['end_logits']
-    #     total_loss = None
-    #     if start_positions is not None and end_positions is not None:
-    #         # If we are on multi-GPU, split add a dimension
-    #         if len(start_positions.size()) > 1:
-    #             start_positions = start_positions.squeeze(-1)
-    #         if len(end_positions.size()) > 1:
-    #             end_positions = end_positions.squeeze(-1)
-    #         # sometimes the start/end positions are outside our model inputs, we ignore these terms
-    #         ignored_index = start_logits.size(1)
-    #         start_positions = start_positions.clamp(0, ignored_index)
-    #         end_positions = end_positions.clamp(0, ignored_index)
-    #
-    #         loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-    #         start_loss = loss_fct(start_logits, start_positions)
-    #         end_loss = loss_fct(end_logits, end_positions)
-    #         total_loss = (start_loss + end_loss) / 2
-    #
-    #     return total_loss
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+
+        Subclass and override for custom behavior.
+        """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        outputs = model(**inputs)
+
+        # # Save past state if it exists
+        # # TODO: this needs to be fixed and made cleaner later.
+        # if self.args.past_index >= 0:
+        #     self._past = outputs[self.args.past_index]
+        #
+        # if labels is not None:
+        #     loss = self.label_smoother(outputs, labels)
+        # else:
+        #     # We don't use .loss here since the model may return tuples instead of ModelOutput.
+        #     loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        #
+        # return (loss, outputs) if return_outputs else loss
+        start_positions = inputs['start_positions']
+        end_positions = inputs['end_positions']
+        start_logits = outputs['start_logits']
+        end_logits = outputs['end_logits']
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions = start_positions.clamp(0, ignored_index)
+            end_positions = end_positions.clamp(0, ignored_index)
+
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+        return total_loss
 
     def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None, metric_key_prefix: str = "eval"):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
