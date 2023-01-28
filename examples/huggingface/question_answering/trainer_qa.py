@@ -46,7 +46,7 @@ class QuestionAnsweringTrainer(Trainer):
         self.quantizer = BERTModelQuantizer("BERT_QA",
                                         self.model,
                                         self.quant_trainer_args.quant_config,
-                                        self.quant_trainer_args.pretraiend_calib)
+                                        self.quant_trainer_args.pretrained_calib)
         self.model = self.quantizer.model
 
     def get_calib_dataloader(self, calib_dataset=None):
@@ -71,11 +71,11 @@ class QuestionAnsweringTrainer(Trainer):
             pin_memory=self.args.dataloader_pin_memory,
             shuffle=True,
         )
-    @classmethod
-    def calib_predict(cls, model, calib_dataloader, calib_num):
+
+    def calib_predict(self, model, calib_dataloader, calib_num):
         for step, inputs in enumerate(calib_dataloader):
             # Prediction step
-            loss, logits, labels = cls.prediction_step(model, inputs, prediction_loss_only=True)
+            loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only=True)
             if (step + 1) * calib_dataloader.batch_size >= calib_num:
                 break
 
@@ -85,7 +85,7 @@ class QuestionAnsweringTrainer(Trainer):
         self.quantizer.calibration(calib_dataloader,
                                    calib_dataloader.batch_size,
                                    save_calib_model=False,
-                                   custom_predict=QuestionAnsweringTrainer.calib_predict)
+                                   custom_predict=self.calib_predict)
 
         # model = self.model
         # quant_trainer.configure_model(model, self.quant_trainer_args, calib=True)

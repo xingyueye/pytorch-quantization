@@ -63,7 +63,7 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        metadata={"help": "Path to pretrained model or model identifier from huggingface_qa.co/models"}
+        metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
@@ -73,7 +73,7 @@ class ModelArguments:
     )
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Path to directory to store the pretrained models downloaded from huggingface_qa.co"},
+        metadata={"help": "Path to directory to store the pretrained models downloaded from huggingface.co"},
     )
     model_revision: str = field(
         default="main",
@@ -577,7 +577,7 @@ def main():
         references = [{"id": ex["id"], "answers": ex[answer_column_name]} for ex in examples]
         return EvalPrediction(predictions=formatted_predictions, label_ids=references)
 
-    metric = load_metric("squad_v2" if data_args.version_2_with_negative else "./squad")
+    metric = load_metric("squad_v2" if data_args.version_2_with_negative else "./hugginface_datasets/metrics/squad")
 
     def compute_metrics(p: EvalPrediction):
         return metric.compute(predictions=p.predictions, references=p.label_ids)
@@ -586,7 +586,7 @@ def main():
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=training_args,
-        train_dataset=train_dataset if training_args.do_train or model_args.do_calib else None,
+        train_dataset=train_dataset if training_args.do_train or quant_trainer_args.do_calib else None,
         eval_dataset=eval_dataset if training_args.do_eval or model_args.save_onnx else None,
         eval_examples=eval_examples if training_args.do_eval or model_args.save_onnx else None,
         tokenizer=tokenizer,
