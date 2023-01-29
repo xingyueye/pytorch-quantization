@@ -75,11 +75,11 @@ class QuestionAnsweringTrainer(Trainer):
             shuffle=True,
         )
 
-    def calib_predict(self, model, calib_dataloader, calib_num):
+    def calib_predict(self, model, calib_dataloader, num_batches):
         for step, inputs in enumerate(calib_dataloader):
             # Prediction step
             loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only=True)
-            if (step + 1) * calib_dataloader.batch_size >= calib_num:
+            if (step + 1)  >= num_batches:
                 break
 
     def calibrate(self, calib_dataset=None):

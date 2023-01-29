@@ -89,36 +89,13 @@ def _internal_predict(model, data_loader, num_batches):
 
 def collect_stats(model, data_loader, num_batches, predict):
     """Feed data to the network and collect statistic"""
-
-    # Enable calibrators
-    # for name, module in model.named_modules():
-    #     if isinstance(module, quant_nn.TensorQuantizer):
-    #         if module._calibrator is not None:
-    #             module.disable_quant()
-    #             module.enable_calib()
-    #         else:
-    #             module.disable()
     enable_calibration(model)
 
     if predict is None:
         _internal_predict(model, data_loader, num_batches)
     else:
         predict(model, data_loader, num_batches)
-    # for i, (image, _) in tqdm(enumerate(data_loader), total=num_batches):
-    #     # image = image.float()/255.0
-    #     model(image.cuda())
-    #     if i >= num_batches:
-    #         break
 
-    predict(model, data_loader, num_batches)
-    # Disable calibrators
-    # for name, module in model.named_modules():
-    #     if isinstance(module, quant_nn.TensorQuantizer):
-    #         if module._calibrator is not None:
-    #             module.enable_quant()
-    #             module.disable_calib()
-    #         else:
-    #             module.enable()
     disable_calibration(model)
 
 
