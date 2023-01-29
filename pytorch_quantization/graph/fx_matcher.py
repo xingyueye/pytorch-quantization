@@ -166,6 +166,7 @@ class HardSigmoidTypePatternMatcher(PatternMatcher):
         super(HardSigmoidTypePatternMatcher, self).__init__()
         self.pattern = HardSigmoidTypePattern()
         self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
         for node in model_traced.graph.nodes:
@@ -186,16 +187,6 @@ class HardSigmoidTypePatternMatcher(PatternMatcher):
                 # node.args[1] is sigmoid node, whose 1st input we want to add quantizer to
                 fx_utils.add_quantizer(node.args[1], model_traced, (0,), (hardsigmoid_quantizer_name,))
 
-
-def get_internal_pattern_matcher():
-    pattern_matchers = list()
-    pattern_matchers.append(ConvBnResReluTypePatternMatcher())
-    pattern_matchers.append(SEReLUTypePatternMatcher())
-    pattern_matchers.append(SESiLUTypePatternMatcher())
-    pattern_matchers.append(DropActDropPathAddTypePatternMatcher())
-    pattern_matchers.append(MeanTypePatternMatcher())
-    pattern_matchers.append(SEAvgPoolTypePatternMatcher())
-    pattern_matchers.append(HardSigmoidTypePatternMatcher())
 
 class BERTQueryKeyTypePatternMatcher(PatternMatcher):
     def __init__(self):
@@ -271,19 +262,6 @@ class BERTResAddTypePatternMatcher(PatternMatcher):
                 fx_utils.add_quantizer(node, model_traced, [0, 1], [out_quantizer_name, res_quantizer_name])
 
 
-def get_internal_pattern_matcher():
-    pattern_matchers = list()
-    # pattern_matchers.append(ConvBnResReluTypePatternMatcher())
-    # pattern_matchers.append(SEReLUTypePatternMatcher())
-    # pattern_matchers.append(SESiLUTypePatternMatcher())
-    # pattern_matchers.append(DropActDropPathAddTypePatternMatcher())
-    # pattern_matchers.append(MeanTypePatternMatcher())
-    # pattern_matchers.append(SEAvgPoolTypePatternMatcher())
-    pattern_matchers.append(BERTQueryKeyTypePatternMatcher())
-    pattern_matchers.append(BERTAttnOutTypePatternMatcher())
-    pattern_matchers.append(BERTResAddTypePatternMatcher())
-    return pattern_matchers
-
 class InstPatternMatcher(object):
     def __init__(self):
         self.pattern_matchers = list()
@@ -300,6 +278,7 @@ class CNNPatternMatcher(InstPatternMatcher):
         self.pattern_matchers.append(DropActDropPathAddTypePatternMatcher())
         self.pattern_matchers.append(MeanTypePatternMatcher())
         self.pattern_matchers.append(SEAvgPoolTypePatternMatcher())
+        self.pattern_matchers.append(HardSigmoidTypePatternMatcher())
 
 class BERTPatternMatcher(InstPatternMatcher):
     def __init__(self):
