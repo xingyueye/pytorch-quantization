@@ -2,7 +2,7 @@ import torch
 from pytorch_quantization import nn as quant_nn
 
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
-           'MeanTypePattern', 'SEAvgPoolTypePattern']
+           'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -99,5 +99,15 @@ class SEAvgPoolTypePattern(torch.nn.Module):
         x = self.avgpool(x)
         x = self.conv_expand(x)
         x = self.bn(x)
+        x = identity * self.gate(x)
+        return x
+
+"""HardSigmoid Block of MobileNetV3"""
+class HardSigmoidTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.gate = torch.nn.Hardsigmoid()
+
+    def forward(self, x, identity):
         x = identity * self.gate(x)
         return x
