@@ -273,7 +273,10 @@ def quant_model_init(model, config, calib_weights='', type_str='CNN', do_trace=T
     model = quant_insert_qdq(model, config, type_str, do_trace)
     if calib_weights:
         state_dict = torch.load(calib_weights, map_location='cpu')
-        model.load_state_dict(state_dict['model'].state_dict())
+        if 'model' in state_dict.keys():
+            model.load_state_dict(state_dict['model'].state_dict())
+        else:
+            model.load_state_dict(state_dict)
     return model
 
 # def bert_quant_insert_qdq(model, config):

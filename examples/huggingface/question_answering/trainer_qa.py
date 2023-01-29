@@ -48,7 +48,9 @@ class QuestionAnsweringTrainer(Trainer):
                                         self.model,
                                         self.quant_trainer_args.quant_config,
                                         self.quant_trainer_args.pretrained_calib)
+        self.quantizer.model.to(self.args.device)
         self.model = self.quantizer.model
+        self.model_wrapped = self.quantizer.model
 
     def get_calib_dataloader(self, calib_dataset=None):
         """
@@ -88,49 +90,13 @@ class QuestionAnsweringTrainer(Trainer):
                                    save_calib_model=True,
                                    custom_predict=self.calib_predict)
 
-        # model = self.model
-        # quant_trainer.configure_model(model, self.quant_trainer_args, calib=True)
-        # model.eval()
-        # quant_trainer.enable_calibration(model)
-        #
-        # logger.info("***** Running calibration *****")
-        # logger.info(f"  Num examples = {self.calib_num}")
-        # logger.info(f"  Batch size = {calib_dataloader.batch_size}")
-        #
-        # for step, inputs in enumerate(calib_dataloader):
-        #     # Prediction step
-        #     loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only=True)
-        #     if (step + 1) * calib_dataloader.batch_size >= self.calib_num:
-        #         break
-        #
-        # quant_trainer.finish_calibration(model, self.quant_trainer_args)
-        # self.model = model
     def compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
 
-        Subclass and override for custom behavior.
-        """
-        if self.label_smoother is not None and "labels" in inputs:
-            labels = inputs.pop("labels")
-        else:
-            labels = None
+        start_positions = inputs.pop('start_positions')
+        end_positions = inputs.pop('end_positions')
+
         outputs = model(**inputs)
 
-        # # Save past state if it exists
-        # # TODO: this needs to be fixed and made cleaner later.
-        # if self.args.past_index >= 0:
-        #     self._past = outputs[self.args.past_index]
-        #
-        # if labels is not None:
-        #     loss = self.label_smoother(outputs, labels)
-        # else:
-        #     # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        #     loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-        #
-        # return (loss, outputs) if return_outputs else loss
-        start_positions = inputs['start_positions']
-        end_positions = inputs['end_positions']
         start_logits = outputs['start_logits']
         end_logits = outputs['end_logits']
         total_loss = None
@@ -154,6 +120,7 @@ class QuestionAnsweringTrainer(Trainer):
 
     def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None, metric_key_prefix: str = "eval"):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
+        self.args.remove_unused_columns = True
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         eval_examples = self.eval_examples if eval_examples is None else eval_examples
 
