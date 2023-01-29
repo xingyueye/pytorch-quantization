@@ -230,3 +230,9 @@ class AdaptiveAvgPool3dConverter(Converter):
         quant_avgpool3d = quant_nn.QuantAdaptiveAvgPool3d(output_size,
                                                     quant_desc_input = self.quant_desc.input_desc)
         return quant_avgpool3d
+
+
+class HardswishConverter(Converter):
+    def convert(self, module):
+        quant_hardswish = quant_nn.HardswishReplace()
+        return quant_hardswish

@@ -30,7 +30,8 @@ _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
                       "AvgPool3d": quant_nn.QuantAvgPool3d,
                       "AdaptiveAvgPool1d": quant_nn.QuantAdaptiveAvgPool1d,
                       "AdaptiveAvgPool2d": quant_nn.QuantAdaptiveAvgPool2d,
-                      "AdaptiveAvgPool3d": quant_nn.QuantAdaptiveAvgPool3d}
+                      "AdaptiveAvgPool3d": quant_nn.QuantAdaptiveAvgPool3d,
+                      "Hardswish": quant_nn.HardswishReplace}
 
 _DEFAULT_DE_QUANT_MAP = {
                       "QuantConv1d": nn.Conv1d,

@@ -27,3 +27,5 @@ from pytorch_quantization.nn.modules.quant_pooling import *
 from pytorch_quantization.nn.modules.clip import *
 from pytorch_quantization.nn.modules.quant_rnn import *
 from pytorch_quantization.nn.modules.quant_instancenorm import *
+
+from pytorch_quantization.nn.modules.act import *
