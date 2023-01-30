@@ -287,6 +287,10 @@ class BERTPatternMatcher(InstPatternMatcher):
         self.pattern_matchers.append(BERTAttnOutTypePatternMatcher())
         self.pattern_matchers.append(BERTResAddTypePatternMatcher())
 
+class FTSwinPatternMatcher(InstPatternMatcher):
+    def __init__(self):
+        super().__init__()
+
 class PatternMatcherFactory(object):
     @classmethod
     def get_pattern_matcher(cls, type_str):

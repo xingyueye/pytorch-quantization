@@ -30,8 +30,13 @@ _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
                       "AvgPool3d": quant_nn.QuantAvgPool3d,
                       "AdaptiveAvgPool1d": quant_nn.QuantAdaptiveAvgPool1d,
                       "AdaptiveAvgPool2d": quant_nn.QuantAdaptiveAvgPool2d,
-                      "AdaptiveAvgPool3d": quant_nn.QuantAdaptiveAvgPool3d,
-                      "Hardswish": quant_nn.HardswishReplace}
+                      "AdaptiveAvgPool3d": quant_nn.QuantAdaptiveAvgPool3d}
+
+_DEFAULT_CNN_CUSTOM_MAP = {"Hardswish": quant_nn.HardswishReplace}
+_DEFAULT_FTSWIN_CUSTOM_MAP = {"Mlp": quant_nn.FTMlp}
+
+_CUSTOM_MAP = {"CNN": _DEFAULT_CNN_CUSTOM_MAP,
+               "FTSwin": _DEFAULT_FTSWIN_CUSTOM_MAP}
 
 _DEFAULT_DE_QUANT_MAP = {
                       "QuantConv1d": nn.Conv1d,
@@ -140,95 +145,18 @@ def quant_ops_replace(model, config, quant_module_map=_DEFAULT_QUANT_MAP):
             converter = globals()['{}Converter'.format(module_type)](quant_desc)
             set_module(model, k, converter.convert(m))
 
-        # if isinstance(m, nn.Conv2d):
-        #     in_channels = m.in_channels
-        #     out_channels = m.out_channels
-        #     kernel_size = m.kernel_size
-        #     stride = m.stride
-        #     padding = m.padding
-        #     groups = m.groups
-        #     quant_conv = quant_nn.QuantConv2d(in_channels,
-        #                                       out_channels,
-        #                                       kernel_size,
-        #                                       stride,
-        #                                       padding,
-        #                                       groups=groups,
-        #                                       quant_desc_input = quant_desc.input_desc,
-        #                                       quant_desc_weight = quant_desc.conv_weight_desc)
-        #     quant_conv.weight.data.copy_(m.weight.detach())
-        #     if m.bias is not None:
-        #         quant_conv.bias.data.copy_(m.bias.detach())
-        #     else:
-        #         quant_conv.bias = None
-        #     set_module(model, k, quant_conv)
-        # elif isinstance(m, nn.ConvTranspose2d):
-        #     in_channels = m.in_channels
-        #     out_channels = m.out_channels
-        #     kernel_size = m.kernel_size
-        #     stride = m.stride
-        #     padding = m.padding
-        #     groups = m.groups
-        #     quant_convtrans = quant_nn.QuantConvTranspose2d(in_channels,
-        #                                                out_channels,
-        #                                                kernel_size,
-        #                                                stride,
-        #                                                padding,
-        #                                                groups=groups,
-        #                                                quant_desc_input = quant_desc.input_desc,
-        #                                                quant_desc_weight = quant_desc.deconv_weight_desc)
-        #     quant_convtrans.weight.data.copy_(m.weight.detach())
-        #     if m.bias is not None:
-        #         quant_convtrans.bias.data.copy_(m.bias.detach())
-        #     else:
-        #         quant_convtrans.bias = None
-        #     set_module(model, k, quant_convtrans)
-        # elif isinstance(m, nn.MaxPool2d):
-        #     kernel_size = m.kernel_size
-        #     stride = m.stride
-        #     padding = m.padding
-        #     dilation = m.dilation
-        #     ceil_mode = m.ceil_mode
-        #     quant_maxpool2d = quant_nn.QuantMaxPool2d(kernel_size,
-        #                                               stride,
-        #                                               padding,
-        #                                               dilation,
-        #                                               ceil_mode=ceil_mode,
-        #                                               quant_desc_input = quant_desc.input_desc)
-        #     set_module(model, k, quant_maxpool2d)
-        # elif isinstance(m, nn.AvgPool2d):
-        #     kernel_size = m.kernel_size
-        #     stride = m.stride
-        #     padding = m.padding
-        #     ceil_mode = m.ceil_mode
-        #     count_include_pad = m.count_include_pad
-        #     quant_avgpool2d = quant_nn.AvgPool2d(kernel_size,
-        #                                               stride,
-        #                                               padding,
-        #                                               ceil_mode,
-        #                                               count_include_pad=count_include_pad,
-        #                                               quant_desc_input = quant_desc.input_desc)
-        #     set_module(model, k, quant_avgpool2d)
-        # elif isinstance(m, nn.AdaptiveAvgPool2d):
-        #     output_size = m.output_size
-        #     quant_avgpool2d = quant_nn.AdaptiveAvgPool2d(output_size,
-        #                                               quant_desc_input = quant_desc.input_desc)
-        #     set_module(model, k, quant_avgpool2d)
-        # elif isinstance(m, nn.Linear):
-        #     quant_linear = quant_nn.QuantLinear(
-        #                                     m.in_features,
-        #                                     m.out_features,
-        #                                     quant_desc_input = quant_desc.input_desc,
-        #                                     quant_desc_weight = quant_desc.deconv_weight_desc)
-        #     quant_linear.weight.data.copy_(m.weight.detach())
-        #     if m.bias is not None:
-        #         quant_linear.bias.data.copy_(m.bias.detach())
-        #     else:
-        #         quant_linear.bias = None
-        #     # quant_linear.to(m.weight.device)
-        #     set_module(model, k, quant_linear)
-        # else:
-        #     # module can not be quantized, continue
-        #     continue
+    return model
+
+def custom_ops_replace(model, config, custom_module_map=_CUSTOM_MAP['CNN']):
+    for k, m in model.named_modules():
+        if skip_layers_check(k, config):
+            print("Skip Layer {}".format(k))
+            continue
+        module_type = m.__class__.__name__
+        if module_type in custom_module_map.keys():
+            converter = globals()['{}Converter'.format(module_type)](None)
+            set_module(model, k, converter.convert(m))
+
     return model
 
 def get_quant_module_map(quant_layers_type=[]):
@@ -238,14 +166,20 @@ def get_quant_module_map(quant_layers_type=[]):
         quant_map = {k:_DEFAULT_QUANT_MAP[k] for k in quant_layers_type if k in _DEFAULT_QUANT_MAP}
         return quant_map
 
+def get_custom_module_map(type_str):
+    return _CUSTOM_MAP[type_str]
+
+
 def quant_insert_qdq(model, config, type_str='CNN', do_trace=True):
     quant_desc = get_quant_desc(config)
     return insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc, type_str, do_trace)
 
 def quant_model_init(model, config, calib_weights='', type_str='CNN', do_trace=True):
     # config = parse_config(config_file)
+    custom_module_map = get_custom_module_map(type_str)
     quant_module_map = get_quant_module_map(config.quant_layers_type)
 
+    model = custom_ops_replace(model, config, custom_module_map)
     model = quant_ops_replace(model, config, quant_module_map)
     model = quant_insert_qdq(model, config, type_str, do_trace)
     if calib_weights:

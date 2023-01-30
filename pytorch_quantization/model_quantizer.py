@@ -8,15 +8,6 @@ from pytorch_quantization.quant_intf import *
 from pytorch_quantization.quant_partial import top1_sensitivity, fast_sensitivity, do_partial_quant
 from pytorch_quantization.quant_utils import model_quant_enable, model_quant_disable
 
-def quantable_layers_gather(model):
-    quantable_layers = []
-    for name, module in model.named_modules():
-        if name.endswith("_quantizer"):
-            layer_name = name.replace("._input_quantizer", "").replace("._weight_quantizer", "")
-            if layer_name not in quantable_layers:
-                quantable_layers.append(layer_name)
-    return quantable_layers
-
 class ModelQuantizer:
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
         self.quant_config = parse_config(config)
@@ -131,3 +122,10 @@ class BERTModelQuantizer(ModelQuantizer):
         quant_model_calib_bert(self.model, data_loader, self.quant_config, batch_size, custom_predict)
         if save_calib_model:
             self._save_calib_weights()
+
+class FTSwinModelQuantizer(ModelQuantizer):
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
+        super(FTSwinModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+
+    def _quant_model_init(self, model, config, calib_weights):
+        return quant_model_init(model, config, calib_weights, type_str='FTSwin', do_trace=True)

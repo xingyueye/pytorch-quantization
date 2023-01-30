@@ -236,3 +236,20 @@ class HardswishConverter(Converter):
     def convert(self, module):
         quant_hardswish = quant_nn.HardswishReplace()
         return quant_hardswish
+
+class MlpConverter(Converter):
+    def convert(self, module):
+        in_features = module.fc1.in_features
+        hidden_features = module.fc1.out_features
+        out_features = module.fc2.out_features
+        act_layer = nn.GELU
+        drop = module.drop1.p
+        ftmlp = quant_nn.FTMlp(in_features, hidden_features, out_features, act_layer, drop)
+        ftmlp.fc1.weight.data.copy_(module.fc1.weight.detach())
+        ftmlp.bias1.data.copy_(module.fc1.bias.detach())
+        ftmlp.fc2.weight.data.copy_(module.fc2.weight.detach())
+        ftmlp.bias2.data.copy_(module.fc2.bias.detach())
+
+        return ftmlp
+
+
