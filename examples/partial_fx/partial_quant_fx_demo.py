@@ -231,6 +231,8 @@ def write_results(filename, arch, acc1, quant_acc1, skip_layers=None, partial_ac
 
 
 def export_onnx(model, onnx_path, args, data_config):
+    model.eval()
+    model.cuda()
     quant_nn.TensorQuantizer.use_fb_fake_quant = True
     data_shape = (args.batch_size,) + data_config['input_size']
     imgs = torch.randn(data_shape).cuda()

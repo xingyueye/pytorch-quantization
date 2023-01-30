@@ -52,7 +52,9 @@ timm_model_list = [
     'efficientnet_b0',
     'efficientnet_b1',
     'efficientnet_b2',
-    'efficientnet_b3'
+    'efficientnet_b3',
+    'mobilenetv3_large_100',
+    'mobilenetv3_small_075'
 ]
 
 def main(args):
