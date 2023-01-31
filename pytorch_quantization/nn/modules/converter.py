@@ -237,19 +237,19 @@ class HardswishConverter(Converter):
         quant_hardswish = quant_nn.HardswishReplace()
         return quant_hardswish
 
-class MlpConverter(Converter):
+class LinearFTConverter(Converter):
     def convert(self, module):
-        in_features = module.fc1.in_features
-        hidden_features = module.fc1.out_features
-        out_features = module.fc2.out_features
-        act_layer = nn.GELU
-        drop = module.drop1.p
-        ftmlp = quant_nn.FTMlp(in_features, hidden_features, out_features, act_layer, drop)
-        ftmlp.fc1.weight.data.copy_(module.fc1.weight.detach())
-        ftmlp.bias1.data.copy_(module.fc1.bias.detach())
-        ftmlp.fc2.weight.data.copy_(module.fc2.weight.detach())
-        ftmlp.bias2.data.copy_(module.fc2.bias.detach())
-
-        return ftmlp
+        quant_linear_ft = quant_nn.QuantLinearFT(
+            module.in_features,
+            module.out_features,
+            quant_desc_input=self.quant_desc.input_desc,
+            quant_desc_weight=self.quant_desc.conv_weight_desc,
+            quant_desc_output=self.quant_desc.input_desc)
+        quant_linear_ft.weight.data.copy_(module.weight.detach())
+        if module.bias is not None:
+            quant_linear_ft.bias.data.copy_(module.bias.detach())
+        else:
+            quant_linear_ft.bias = None
+        return quant_linear_ft
 
 

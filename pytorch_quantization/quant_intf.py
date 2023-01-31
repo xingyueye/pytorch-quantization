@@ -2,15 +2,14 @@ import yaml
 from easydict import EasyDict
 from tqdm import tqdm
 
-import torch
-import torch.nn as nn
-from pytorch_quantization import nn as quant_nn
+# import torch
+# import torch.nn as nn
+# from pytorch_quantization import nn as quant_nn
 from pytorch_quantization import calib
 from pytorch_quantization.tensor_quant import QuantDescriptor
 from pytorch_quantization.quant_utils import set_module
 from pytorch_quantization.quant_fx import insert_qdq_nodes_via_subgraph_match
 from pytorch_quantization.nn.modules.converter import *
-from pytorch_quantization.onnx_utils import remove_qdq_nodes_from_qat_onnx
 
 
 _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
@@ -33,7 +32,7 @@ _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
                       "AdaptiveAvgPool3d": quant_nn.QuantAdaptiveAvgPool3d}
 
 _DEFAULT_CNN_CUSTOM_MAP = {"Hardswish": quant_nn.HardswishReplace}
-_DEFAULT_FTSWIN_CUSTOM_MAP = {"Mlp": quant_nn.FTMlp}
+_DEFAULT_FTSWIN_CUSTOM_MAP = {"LinearFT": quant_nn.QuantLinearFT}
 
 _CUSTOM_MAP = {"CNN": _DEFAULT_CNN_CUSTOM_MAP,
                "FTSwin": _DEFAULT_FTSWIN_CUSTOM_MAP}

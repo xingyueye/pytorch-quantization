@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 from pytorch_quantization.quant_intf import *
 from pytorch_quantization.quant_partial import top1_sensitivity, fast_sensitivity, do_partial_quant
 from pytorch_quantization.quant_utils import model_quant_enable, model_quant_disable
+from pytorch_quantization.utils.onnx_utils import remove_qdq_nodes_from_qat_onnx
 
 class ModelQuantizer:
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):

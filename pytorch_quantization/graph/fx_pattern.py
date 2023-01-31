@@ -3,7 +3,7 @@ from pytorch_quantization import nn as quant_nn
 
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern', 'BERTQueryKeyTypePattern', 'BERTAttnOutTypePattern',
-           'BERTResAddTypePattern']
+           'BERTResAddTypePattern', 'FTSwinMatmulTypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -148,4 +148,14 @@ class BERTResAddTypePattern(torch.nn.Module):
         x = self.dense(x)
         x = self.dropout(x)
         x = x + identity
+        return x
+
+
+"""Matmul of FTSwin MHA"""
+class FTSwinMatmulTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, input1, input2):
+        x = torch.matmul(input1, input2)
         return x

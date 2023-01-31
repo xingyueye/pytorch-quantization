@@ -23,6 +23,7 @@ from pytorch_quantization.nn.quantizer.tensor_lsq_plus_quantizer import *
 
 from pytorch_quantization.nn.modules.quant_conv import *
 from pytorch_quantization.nn.modules.quant_linear import *
+from pytorch_quantization.nn.modules.quant_linear_ft import *
 from pytorch_quantization.nn.modules.quant_pooling import *
 from pytorch_quantization.nn.modules.clip import *
 from pytorch_quantization.nn.modules.quant_rnn import *
