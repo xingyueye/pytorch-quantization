@@ -4,7 +4,7 @@ from pytorch_quantization import nn as quant_nn
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern', 'BERTQueryKeyTypePattern', 'BERTAttnOutTypePattern',
            'BERTResAddTypePattern', 'FTSWINQKMatmulTypePattern','FTSWINAVMatmulTypePattern','FTSWINSoftmaxTypePattern',
-           'FTSWINResAddNorm1TypePattern', 'FTSWINResAddNorm2TypePattern']
+           'FTSWINResAdd1TypePattern', 'FTSWINNorm1TypePattern', 'FTSWINResAddNorm2TypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -181,28 +181,40 @@ class FTSWINSoftmaxTypePattern(torch.nn.Module):
         x = self.softmax(x)
         return x
 
-"""ResAddNorm1 of FTSwin"""
-class FTSWINResAddNorm1TypePattern(torch.nn.Module):
+
+
+"""ResAdd1 of FTSwin"""
+class FTSWINResAdd1TypePattern(torch.nn.Module):
     def __init__(self,):
         super().__init__()
-        from timm.models.layers import DropPath
+        from timm.models.layers import DropPath, Mlp
         self.drop_path = DropPath(0.1)
-        self.norm = torch.nn.LayerNorm(128)
+        self.mlp = Mlp(128,128,128)
+
     def forward(self, x, shortcut):
-        x = shortcut + self.drop_path(x.view(1,2,3))
+        x = shortcut + self.drop_path(self.mlp(x))
+        return x
+
+"""Norm1 of FTSwin"""
+class FTSWINNorm1TypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.norm = torch.nn.LayerNorm(128)
+
+    def forward(self, x):
         x = self.norm(x)
+        x = x.view(1,2,3)
         return x
 
 """ResAddNorm2 of FTSwin"""
 class FTSWINResAddNorm2TypePattern(torch.nn.Module):
-    def __init__(self,):
+    def __init__(self, ):
         super().__init__()
-        from timm.models.layers import DropPath, Mlp
-        self.mlp = Mlp(128, 128, 128)
+        from timm.models.layers import DropPath
         self.drop_path = DropPath(0.1)
         self.norm = torch.nn.LayerNorm(128)
 
     def forward(self, x, shortcut):
-        x = shortcut + self.drop_path(self.mlp(x))
+        x = shortcut + self.drop_path(x.view(1, 2, 3))
         x = self.norm(x)
         return x
