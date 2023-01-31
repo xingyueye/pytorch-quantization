@@ -3,7 +3,8 @@ from pytorch_quantization import nn as quant_nn
 
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern', 'BERTQueryKeyTypePattern', 'BERTAttnOutTypePattern',
-           'BERTResAddTypePattern', 'FTSWINQKMatmulTypePattern','FTSWINAVMatmulTypePattern','FTSWINSoftmaxTypePattern']
+           'BERTResAddTypePattern', 'FTSWINQKMatmulTypePattern','FTSWINAVMatmulTypePattern','FTSWINSoftmaxTypePattern',
+           'FTSWINResAddNorm1TypePattern', 'FTSWINResAddNorm2TypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -174,26 +175,34 @@ class FTSWINAVMatmulTypePattern(torch.nn.Module):
 class FTSWINSoftmaxTypePattern(torch.nn.Module):
     def __init__(self,):
         super().__init__()
+        self.softmax = torch.nn.Softmax(dim=-1)
 
     def forward(self, x):
-        x = torch.nn.functional.softmax(x, dim=-1)
+        x = self.softmax(x)
         return x
 
-"""ResAdd1 of FTSwin"""
-class FTSWINResAdd1TypePattern(torch.nn.Module):
+"""ResAddNorm1 of FTSwin"""
+class FTSWINResAddNorm1TypePattern(torch.nn.Module):
     def __init__(self,):
         super().__init__()
+        from timm.models.layers import DropPath
+        self.drop_path = DropPath(0.1)
+        self.norm = torch.nn.LayerNorm(128)
+    def forward(self, x, identity):
+        x = self.drop_path(x.view(1,2,3)) + identity
+        x = self.norm(x)
+        return x
+
+"""ResAddNorm2 of FTSwin"""
+class FTSWINResAddNorm2TypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        from timm.models.layers import DropPath, Mlp
+        self.mlp = Mlp(128, 128, 128)
+        self.drop_path = DropPath(0.1)
+        self.norm = torch.nn.LayerNorm(128)
 
     def forward(self, x, identity):
-        x = x + x.view(1,2,3)
+        x = self.drop_path(self.mlp(x)) + identity
+        x = self.norm(x)
         return x
-
-"""ResAdd2 of FTSwin"""
-class FTSWINResAdd2TypePattern(torch.nn.Module):
-    def __init__(self,):
-        super().__init__()
-
-    def forward(self, x):
-        x = torch.nn.functional.softmax(x, dim=-1)
-        return x
-
