@@ -149,13 +149,15 @@ def quant_ops_replace(model, config, quant_module_map=_DEFAULT_QUANT_MAP):
     return model
 
 def custom_ops_replace(model, config, custom_module_map=_CUSTOM_MAP['CNN']):
+    quant_desc = get_quant_desc(config)
+
     for k, m in model.named_modules():
         if skip_layers_check(k, config):
             print("Skip Layer {}".format(k))
             continue
         module_type = m.__class__.__name__
         if module_type in custom_module_map.keys():
-            converter = globals()['{}CustomConverter'.format(module_type)](None)
+            converter = globals()['{}CustomConverter'.format(module_type)](quant_desc)
             set_module(model, k, converter.convert(m))
 
     return model
