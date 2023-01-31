@@ -157,7 +157,7 @@ class FTSWINQKMatmulTypePattern(torch.nn.Module):
         super().__init__()
 
     def forward(self, q, k):
-        x = torch.matmul(q, k.transpose(-2,-1))
+        x = (q @ k.transpose(-2,-1))
         return x
 
 """AV Matmul of FTSwin MHA"""
@@ -168,7 +168,7 @@ class FTSWINAVMatmulTypePattern(torch.nn.Module):
 
     def forward(self, a, v):
         x = self.dropout(a)
-        x = torch.matmul(x, v)
+        x = (x @ v)
         return x
 
 """Softmax of FTSwin MHA"""
@@ -188,8 +188,8 @@ class FTSWINResAddNorm1TypePattern(torch.nn.Module):
         from timm.models.layers import DropPath
         self.drop_path = DropPath(0.1)
         self.norm = torch.nn.LayerNorm(128)
-    def forward(self, x, identity):
-        x = self.drop_path(x.view(1,2,3)) + identity
+    def forward(self, x, shortcut):
+        x = shortcut + self.drop_path(x.view(1,2,3))
         x = self.norm(x)
         return x
 
@@ -202,7 +202,7 @@ class FTSWINResAddNorm2TypePattern(torch.nn.Module):
         self.drop_path = DropPath(0.1)
         self.norm = torch.nn.LayerNorm(128)
 
-    def forward(self, x, identity):
-        x = self.drop_path(self.mlp(x)) + identity
+    def forward(self, x, shortcut):
+        x = shortcut + self.drop_path(self.mlp(x))
         x = self.norm(x)
         return x

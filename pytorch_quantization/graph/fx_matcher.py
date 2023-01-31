@@ -343,15 +343,15 @@ class FTSWINResAddNorm1TypePatternMatcher(PatternMatcher):
                 # Add quantizer to identity branch
                 print('node: ', node, node.name, node.args[0].name)
 
+                add1_res_quantizer_name = F"{'.'.join(node.name.split('.'))}.add1_residual_input_quantizer"
+                add1_res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(add1_res_quantizer_name, add1_res_quantizer)
+    
                 add1_local_quantizer_name = F"{'.'.join(node.name.split('.'))}.add1_local_input_quantizer"
                 add1_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(add1_local_quantizer_name, add1_local_quantizer)
 
-                add1_res_quantizer_name = F"{'.'.join(node.name.split('.'))}.add1_residual_input_quantizer"
-                add1_res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
-                model_traced.add_submodule(add1_res_quantizer_name, add1_res_quantizer)
-
-                fx_utils.add_quantizer(node.args[0], model_traced, [0, 1], [add1_local_quantizer_name, add1_res_quantizer_name])
+                fx_utils.add_quantizer(node.args[0], model_traced, [0, 1], [add1_res_quantizer_name, add1_local_quantizer_name])
 
                 norm1_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm1_input_quantizer"
                 norm1_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
@@ -372,16 +372,16 @@ class FTSWINResAddNorm2TypePatternMatcher(PatternMatcher):
                 # Add quantizer to identity branch
                 print('node: ', node, node.name, node.args[0].name)
 
-                add2_local_quantizer_name = F"{'.'.join(node.name.split('.'))}.add2_local_input_quantizer"
-                add2_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
-                model_traced.add_submodule(add2_local_quantizer_name, add2_local_quantizer)
-
                 add2_res_quantizer_name = F"{'.'.join(node.name.split('.'))}.add2_residual_input_quantizer"
                 add2_res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(add2_res_quantizer_name, add2_res_quantizer)
 
+                add2_local_quantizer_name = F"{'.'.join(node.name.split('.'))}.add2_local_input_quantizer"
+                add2_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(add2_local_quantizer_name, add2_local_quantizer)
+
                 # insert quantizer to add
-                fx_utils.add_quantizer(node.args[0], model_traced, [0, 1], [add2_local_quantizer_name, add2_res_quantizer_name])
+                fx_utils.add_quantizer(node.args[0], model_traced, [0, 1], [add2_res_quantizer_name, add2_local_quantizer_name])
 
                 # insert quantizer to layernorm
                 norm2_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm2_input_quantizer"
