@@ -35,7 +35,7 @@ _DEFAULT_CNN_CUSTOM_MAP = {"Hardswish": quant_nn.HardswishReplace}
 _DEFAULT_FTSWIN_CUSTOM_MAP = {"Linear": quant_nn.QuantLinearFT}
 
 _CUSTOM_MAP = {"CNN": _DEFAULT_CNN_CUSTOM_MAP,
-               "FTSwin": _DEFAULT_FTSWIN_CUSTOM_MAP}
+               "FTSWIN": _DEFAULT_FTSWIN_CUSTOM_MAP}
 
 _DEFAULT_DE_QUANT_MAP = {
                       "QuantConv1d": nn.Conv1d,

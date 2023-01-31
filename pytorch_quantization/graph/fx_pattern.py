@@ -3,7 +3,7 @@ from pytorch_quantization import nn as quant_nn
 
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern', 'BERTQueryKeyTypePattern', 'BERTAttnOutTypePattern',
-           'BERTResAddTypePattern', 'FTSwinMatmulTypePattern']
+           'BERTResAddTypePattern', 'FTSWINQKMatmulTypePattern','FTSWINAVMatmulTypePattern','FTSWINSoftmaxTypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -150,12 +150,50 @@ class BERTResAddTypePattern(torch.nn.Module):
         x = x + identity
         return x
 
-
-"""Matmul of FTSwin MHA"""
-class FTSwinMatmulTypePattern(torch.nn.Module):
+"""QK Matmul of FTSwin MHA"""
+class FTSWINQKMatmulTypePattern(torch.nn.Module):
     def __init__(self,):
         super().__init__()
 
-    def forward(self, input1, input2):
-        x = torch.matmul(input1, input2)
+    def forward(self, q, k):
+        x = torch.matmul(q, k.transpose(-2,-1))
         return x
+
+"""AV Matmul of FTSwin MHA"""
+class FTSWINAVMatmulTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.dropout = torch.nn.Dropout()
+
+    def forward(self, a, v):
+        x = self.dropout(a)
+        x = torch.matmul(x, v)
+        return x
+
+"""Softmax of FTSwin MHA"""
+class FTSWINSoftmaxTypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, x):
+        x = torch.nn.functional.softmax(x, dim=-1)
+        return x
+
+"""ResAdd1 of FTSwin"""
+class FTSWINResAdd1TypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, x, identity):
+        x = x + x.view(1,2,3)
+        return x
+
+"""ResAdd2 of FTSwin"""
+class FTSWINResAdd2TypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+
+    def forward(self, x):
+        x = torch.nn.functional.softmax(x, dim=-1)
+        return x
+

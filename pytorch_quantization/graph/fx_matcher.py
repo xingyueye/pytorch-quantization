@@ -22,7 +22,7 @@ class ConvBnResReluTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(ConvBnResReluTypePatternMatcher, self).__init__()
         self.pattern = ConvBnResReluTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.CNNLowerQuantOpTracer().trace(self.pattern)
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
@@ -41,7 +41,7 @@ class SEReLUTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(SEReLUTypePatternMatcher, self).__init__()
         self.pattern = SEReLUTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.CNNLowerQuantOpTracer().trace(self.pattern)
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
@@ -73,7 +73,7 @@ class SESiLUTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(SESiLUTypePatternMatcher, self).__init__()
         self.pattern = SESiLUTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.CNNLowerQuantOpTracer().trace(self.pattern)
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
@@ -100,7 +100,7 @@ class DropActDropPathAddTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(DropActDropPathAddTypePatternMatcher, self).__init__()
         self.pattern = DropActDropPathAddTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.CNNLowerQuantOpTracer().trace(self.pattern)
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
@@ -119,7 +119,7 @@ class MeanTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(MeanTypePatternMatcher, self).__init__()
         self.pattern = MeanTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.CNNLowerQuantOpTracer().trace(self.pattern)
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
@@ -138,7 +138,7 @@ class SEAvgPoolTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(SEAvgPoolTypePatternMatcher, self).__init__()
         self.pattern = SEAvgPoolTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.CNNLowerQuantOpTracer().trace(self.pattern)
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
@@ -165,7 +165,7 @@ class HardSigmoidTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(HardSigmoidTypePatternMatcher, self).__init__()
         self.pattern = HardSigmoidTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.CNNLowerQuantOpTracer().trace(self.pattern)
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
     def match_and_insert(self, model_traced, quantizer_desc):
@@ -192,7 +192,7 @@ class BERTQueryKeyTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(BERTQueryKeyTypePatternMatcher, self).__init__()
         self.pattern = BERTQueryKeyTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.BERTLowerQuantOpTracer().trace(self.pattern)
         self.pattern_graph.print_tabular()
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
@@ -216,7 +216,7 @@ class BERTAttnOutTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(BERTAttnOutTypePatternMatcher, self).__init__()
         self.pattern = BERTAttnOutTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.BERTLowerQuantOpTracer().trace(self.pattern)
         self.pattern_graph.print_tabular()
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
@@ -241,7 +241,7 @@ class BERTResAddTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(BERTResAddTypePatternMatcher, self).__init__()
         self.pattern = BERTResAddTypePattern()
-        self.pattern_graph = fx_utils.LowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph = fx_utils.BERTLowerQuantOpTracer().trace(self.pattern)
         self.pattern_graph.print_tabular()
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
 
@@ -287,7 +287,7 @@ class BERTPatternMatcher(InstPatternMatcher):
         self.pattern_matchers.append(BERTAttnOutTypePatternMatcher())
         self.pattern_matchers.append(BERTResAddTypePatternMatcher())
 
-class FTSwinPatternMatcher(InstPatternMatcher):
+class FTSWINPatternMatcher(InstPatternMatcher):
     def __init__(self):
         super().__init__()
 

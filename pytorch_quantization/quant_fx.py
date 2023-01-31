@@ -1,6 +1,6 @@
 import torch.fx as fx
 
-from pytorch_quantization.graph import fx_utils
+from pytorch_quantization.graph.fx_utils import LowerTracerFactory
 from pytorch_quantization.graph.fx_matcher import PatternMatcherFactory
 
 
@@ -29,7 +29,8 @@ def insert_qdq_nodes_via_subgraph_match(model, quantizer_desc, type_str='CNN', d
     if do_trace:
         model.eval()
         # We use LowerQuantOpTracer
-        model_traced = fx.GraphModule(model, fx_utils.LowerQuantOpTracer().trace(model))
+        lower_tracer = LowerTracerFactory.get_lower_tracer(type_str)
+        model_traced = fx.GraphModule(model, lower_tracer.trace(model))
     else:
         model_traced = model
     # Pattern match

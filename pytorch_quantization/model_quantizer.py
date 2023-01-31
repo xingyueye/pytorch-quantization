@@ -124,9 +124,9 @@ class BERTModelQuantizer(ModelQuantizer):
         if save_calib_model:
             self._save_calib_weights()
 
-class FTSwinModelQuantizer(ModelQuantizer):
+class FTSWINModelQuantizer(ModelQuantizer):
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(FTSwinModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+        super(FTSWINModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
 
     def _quant_model_init(self, model, config, calib_weights):
-        return quant_model_init(model, config, calib_weights, type_str='FTSwin', do_trace=True)
+        return quant_model_init(model, config, calib_weights, type_str='FTSWIN', do_trace=True)
