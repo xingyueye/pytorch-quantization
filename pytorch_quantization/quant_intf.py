@@ -32,7 +32,7 @@ _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
                       "AdaptiveAvgPool3d": quant_nn.QuantAdaptiveAvgPool3d}
 
 _DEFAULT_CNN_CUSTOM_MAP = {"Hardswish": quant_nn.HardswishReplace}
-_DEFAULT_FTSWIN_CUSTOM_MAP = {"LinearFT": quant_nn.QuantLinearFT}
+_DEFAULT_FTSWIN_CUSTOM_MAP = {"Linear": quant_nn.QuantLinearFT}
 
 _CUSTOM_MAP = {"CNN": _DEFAULT_CNN_CUSTOM_MAP,
                "FTSwin": _DEFAULT_FTSWIN_CUSTOM_MAP}
@@ -126,6 +126,8 @@ def get_quant_desc(config):
                                                   quantizer_type=config.w_qscheme.quantizer_type),
         "deconv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(1), calib_method=config.w_qscheme.calib_method,
                                                   quantizer_type=config.w_qscheme.quantizer_type),
+        "output_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,
+                                      quantizer_type=config.a_qscheme.quantizer_type),
     }
     return EasyDict(quant_desc)
 
@@ -153,7 +155,7 @@ def custom_ops_replace(model, config, custom_module_map=_CUSTOM_MAP['CNN']):
             continue
         module_type = m.__class__.__name__
         if module_type in custom_module_map.keys():
-            converter = globals()['{}Converter'.format(module_type)](None)
+            converter = globals()['{}CustomConverter'.format(module_type)](None)
             set_module(model, k, converter.convert(m))
 
     return model

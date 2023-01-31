@@ -232,19 +232,19 @@ class AdaptiveAvgPool3dConverter(Converter):
         return quant_avgpool3d
 
 
-class HardswishConverter(Converter):
+class HardswishCustomConverter(Converter):
     def convert(self, module):
         quant_hardswish = quant_nn.HardswishReplace()
         return quant_hardswish
 
-class LinearFTConverter(Converter):
+class LinearCustomConverter(Converter):
     def convert(self, module):
         quant_linear_ft = quant_nn.QuantLinearFT(
             module.in_features,
             module.out_features,
             quant_desc_input=self.quant_desc.input_desc,
             quant_desc_weight=self.quant_desc.conv_weight_desc,
-            quant_desc_output=self.quant_desc.input_desc)
+            quant_desc_output=self.quant_desc.output_desc)
         quant_linear_ft.weight.data.copy_(module.weight.detach())
         if module.bias is not None:
             quant_linear_ft.bias.data.copy_(module.bias.detach())
