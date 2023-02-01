@@ -1,3 +1,4 @@
+import re
 from pytorch_quantization import nn as quant_nn
 
 def set_module(model, submodule_key, module):
@@ -38,4 +39,15 @@ def model_quant_enable(model):
     for name, module in model.named_modules():
         if isinstance(module, quant_nn.TensorQuantizer):
             module.enable()
+
+def set_quantizer_by_name(model, names, **kwargs):
+    """Set quantizer attributes for layers where name contains a substring in names."""
+    for name, mod in model.named_modules():
+        if name.endswith('_quantizer'):
+            for n in names:
+                if re.search(n, name):
+                    s = f'Warning: changing {name}'
+                    for k, v in kwargs.items():
+                        s += (f' {k}={v}')
+                        setattr(mod, k, v)
 

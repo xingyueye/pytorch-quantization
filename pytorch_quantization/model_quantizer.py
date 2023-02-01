@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 from pytorch_quantization.quant_intf import *
 from pytorch_quantization.quant_partial import top1_sensitivity, fast_sensitivity, do_partial_quant
-from pytorch_quantization.quant_utils import model_quant_enable, model_quant_disable
+from pytorch_quantization.quant_utils import model_quant_enable, model_quant_disable, set_quantizer_by_name
 from pytorch_quantization.utils.onnx_utils import remove_qdq_nodes_from_qat_onnx
 
 class ModelQuantizer:
@@ -130,3 +130,6 @@ class FTSWINModelQuantizer(ModelQuantizer):
 
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init(model, config, calib_weights, type_str='FTSWIN', do_trace=True)
+
+    def disable_quantizer_by_name(self, quantizer_name_list):
+        set_quantizer_by_name(self.model, quantizer_name_list, _disabled=True)
