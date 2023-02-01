@@ -351,12 +351,12 @@ class FTSWINResAdd1TypePatternMatcher(PatternMatcher):
                 add1_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(add1_local_quantizer_name, add1_local_quantizer)
 
-                fx_utils.add_quantizer(node.args[0], model_traced, [0, 1], [add1_res_quantizer_name, add1_local_quantizer_name])
+                fx_utils.add_quantizer(node, model_traced, [0, 1], [add1_res_quantizer_name, add1_local_quantizer_name])
 
 class FTSWINNorm1TypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(FTSWINNorm1TypePatternMatcher, self).__init__()
-        self.pattern = FTSWINResAdd1TypePattern()
+        self.pattern = FTSWINNorm1TypePattern()
         self.pattern_graph = fx_utils.FTSWINLowerQuantOpTracer().trace(self.pattern)
         self.pattern_graph.print_tabular()
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
@@ -373,10 +373,10 @@ class FTSWINNorm1TypePatternMatcher(PatternMatcher):
                 model_traced.add_submodule(norm1_quantizer_name, norm1_quantizer)
                 fx_utils.add_quantizer(node.args[0], model_traced, [0], [norm1_quantizer_name])
 
-class FTSWINResAddNorm2TypePatternMatcher(PatternMatcher):
+class FTSWINResAdd2TypePatternMatcher(PatternMatcher):
     def __init__(self):
-        super(FTSWINResAddNorm2TypePatternMatcher, self).__init__()
-        self.pattern = FTSWINResAddNorm2TypePattern()
+        super(FTSWINResAdd2TypePatternMatcher, self).__init__()
+        self.pattern = FTSWINResAdd2TypePattern()
         self.pattern_graph = fx_utils.FTSWINLowerQuantOpTracer().trace(self.pattern)
         self.pattern_graph.print_tabular()
         self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
@@ -396,13 +396,28 @@ class FTSWINResAddNorm2TypePatternMatcher(PatternMatcher):
                 model_traced.add_submodule(add2_local_quantizer_name, add2_local_quantizer)
 
                 # insert quantizer to add
-                fx_utils.add_quantizer(node.args[0], model_traced, [0, 1], [add2_res_quantizer_name, add2_local_quantizer_name])
+                fx_utils.add_quantizer(node, model_traced, [0, 1], [add2_res_quantizer_name, add2_local_quantizer_name])
+
+
+class FTSWINNorm2TypePatternMatcher(PatternMatcher):
+    def __init__(self):
+        super(FTSWINNorm2TypePatternMatcher, self).__init__()
+        self.pattern = FTSWINNorm2TypePattern()
+        self.pattern_graph = fx_utils.FTSWINLowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph.print_tabular()
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
+
+    def match_and_insert(self, model_traced, quantizer_desc):
+        for node in model_traced.graph.nodes:
+            if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
+                # Add quantizer to identity branch
+                print('node: ', node, node.name, node.args[0].name)
 
                 # insert quantizer to layernorm
                 norm2_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm2_input_quantizer"
                 norm2_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(norm2_quantizer_name, norm2_quantizer)
-                fx_utils.add_quantizer(node, model_traced, [0], [norm2_quantizer_name])
+                fx_utils.add_quantizer(node.args[0], model_traced, [0], [norm2_quantizer_name])
 
 class InstPatternMatcher(object):
     def __init__(self):
@@ -437,7 +452,8 @@ class FTSWINPatternMatcher(InstPatternMatcher):
         self.pattern_matchers.append(FTSWINSoftmaxTypePatternMatcher())
         self.pattern_matchers.append(FTSWINResAdd1TypePatternMatcher())
         self.pattern_matchers.append(FTSWINNorm1TypePatternMatcher())
-        self.pattern_matchers.append(FTSWINResAddNorm2TypePatternMatcher())
+        self.pattern_matchers.append(FTSWINResAdd2TypePatternMatcher())
+        self.pattern_matchers.append(FTSWINNorm2TypePatternMatcher())
 
 
 class PatternMatcherFactory(object):

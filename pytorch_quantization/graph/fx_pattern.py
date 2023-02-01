@@ -4,7 +4,7 @@ from pytorch_quantization import nn as quant_nn
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern', 'BERTQueryKeyTypePattern', 'BERTAttnOutTypePattern',
            'BERTResAddTypePattern', 'FTSWINQKMatmulTypePattern','FTSWINAVMatmulTypePattern','FTSWINSoftmaxTypePattern',
-           'FTSWINResAdd1TypePattern', 'FTSWINNorm1TypePattern', 'FTSWINResAddNorm2TypePattern']
+           'FTSWINResAdd1TypePattern', 'FTSWINNorm1TypePattern', 'FTSWINResAdd2TypePattern', 'FTSWINNorm2TypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -181,11 +181,34 @@ class FTSWINSoftmaxTypePattern(torch.nn.Module):
         x = self.softmax(x)
         return x
 
+"""Norm1 of FTSwin"""
+class FTSWINNorm1TypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.norm = torch.nn.LayerNorm(128)
 
+    def forward(self, x):
+        B, L, C = x.shape
+        x = self.norm(x)
+        x = x.view(B, 14, 14, C)
+        return x
 
 """ResAdd1 of FTSwin"""
 class FTSWINResAdd1TypePattern(torch.nn.Module):
     def __init__(self,):
+        super().__init__()
+        from timm.models.layers import DropPath
+        self.drop_path = DropPath(0.1)
+
+    def forward(self, x, shortcut):
+        B, L, C = x.shape
+        x = shortcut + self.drop_path(x.view(B,14,14,C))
+        return x
+
+
+"""ResAdd2 of FTSwin"""
+class FTSWINResAdd2TypePattern(torch.nn.Module):
+    def __init__(self, ):
         super().__init__()
         from timm.models.layers import DropPath, Mlp
         self.drop_path = DropPath(0.1)
@@ -195,26 +218,14 @@ class FTSWINResAdd1TypePattern(torch.nn.Module):
         x = shortcut + self.drop_path(self.mlp(x))
         return x
 
-"""Norm1 of FTSwin"""
-class FTSWINNorm1TypePattern(torch.nn.Module):
-    def __init__(self,):
+"""Norm2 of FTSwin"""
+class FTSWINNorm2TypePattern(torch.nn.Module):
+    def __init__(self, ):
         super().__init__()
+        from timm.models.layers import Mlp
+        self.mlp = Mlp(128,128,128)
         self.norm = torch.nn.LayerNorm(128)
 
     def forward(self, x):
-        x = self.norm(x)
-        x = x.view(1,2,3)
-        return x
-
-"""ResAddNorm2 of FTSwin"""
-class FTSWINResAddNorm2TypePattern(torch.nn.Module):
-    def __init__(self, ):
-        super().__init__()
-        from timm.models.layers import DropPath
-        self.drop_path = DropPath(0.1)
-        self.norm = torch.nn.LayerNorm(128)
-
-    def forward(self, x, shortcut):
-        x = shortcut + self.drop_path(x.view(1, 2, 3))
-        x = self.norm(x)
+        x = self.mlp(self.norm(x))
         return x
