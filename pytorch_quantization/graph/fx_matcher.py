@@ -368,7 +368,7 @@ class FTSWINNorm1TypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.name, node.args[0].name)
 
                 # insert quantizer to layernorm
-                norm1_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm1_input_quantizer"
+                norm1_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm_input1_quantizer"
                 norm1_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(norm1_quantizer_name, norm1_quantizer)
                 fx_utils.add_quantizer(node.args[0], model_traced, [0], [norm1_quantizer_name])
@@ -414,7 +414,7 @@ class FTSWINNorm2TypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.name, node.args[0].name)
 
                 # insert quantizer to layernorm
-                norm2_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm2_input_quantizer"
+                norm2_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm_input2_quantizer"
                 norm2_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(norm2_quantizer_name, norm2_quantizer)
                 fx_utils.add_quantizer(node.args[0], model_traced, [0], [norm2_quantizer_name])
