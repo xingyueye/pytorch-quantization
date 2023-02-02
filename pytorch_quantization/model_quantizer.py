@@ -133,3 +133,29 @@ class FTSWINModelQuantizer(ModelQuantizer):
 
     def disable_quantizer_by_name(self, quantizer_name_list):
         set_quantizer_by_name(self.model, quantizer_name_list, _disabled=True)
+
+    def fuse_qkv(self,):
+        """Adjust quantization ranges to match an implementation where the QKV projections are implemented with a single GEMM.
+        Force the weight and output scale factors to match by taking the max of (Q,K,V).
+        """
+
+        def fuse3(qq, qk, qv):
+            if not hasattr(qq, '_amax') or not hasattr(qk, '_amax') or not hasattr(qv, '_amax'):
+                logger.warn('missing amax buffer, unable to fuse')
+                return
+            q = qq._amax.detach().item()
+            k = qk._amax.detach().item()
+            v = qv._amax.detach().item()
+
+            amax = max(q, k, v)
+            qq._amax.fill_(amax)
+            qk._amax.fill_(amax)
+            qv._amax.fill_(amax)
+            logger.info(f'          q={q:7.4f} k={k:7.4f} v={v:7.4f} -> {amax:7.4f}')
+
+        for name, mod in self.model.named_modules():
+            if name.endswith('.attention.self'):
+                print(name)
+                fuse3(mod.matmul_q_input_quantizer, mod.matmul_k_input_quantizer, mod.matmul_v_input_quantizer)
+                fuse3(mod.query._weight_quantizer, mod.key._weight_quantizer, mod.value._weight_quantizer)
+                fuse3(mod.query._aftergemm_quantizer, mod.key._aftergemm_quantizer, mod.value._aftergemm_quantizer)
