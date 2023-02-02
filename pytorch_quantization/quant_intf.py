@@ -122,10 +122,12 @@ def get_quant_desc(config):
     quant_desc = {
         "input_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,
                                                  quantizer_type=config.a_qscheme.quantizer_type),
-        "conv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(0), calib_method=config.w_qscheme.calib_method,
-                                                  quantizer_type=config.w_qscheme.quantizer_type),
-        "deconv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(1), calib_method=config.w_qscheme.calib_method,
-                                                  quantizer_type=config.w_qscheme.quantizer_type),
+        "conv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(0) if config.w_qscheme.per_channel is True else None,
+                                            calib_method=config.w_qscheme.calib_method,
+                                            quantizer_type=config.w_qscheme.quantizer_type),
+        "deconv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(1) if config.w_qscheme.per_channel is True else None,
+                                              calib_method=config.w_qscheme.calib_method,
+                                              quantizer_type=config.w_qscheme.quantizer_type),
         "output_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,
                                       quantizer_type=config.a_qscheme.quantizer_type),
     }
