@@ -347,6 +347,34 @@ class FTSWINSoftmaxTypePatternMatcher(PatternMatcher):
 
                 fx_utils.add_quantizer(node, model_traced, [0], [softmax_quantizer_name])
 
+class FTSWINFirstResAdd1TypePatternMatcher(PatternMatcher):
+    def __init__(self):
+        super(FTSWINFirstResAdd1TypePatternMatcher, self).__init__()
+        self.pattern = FTSWINFirstResAdd1TypePattern()
+        self.pattern_graph = fx_utils.FTSWINLowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph.print_tabular()
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
+
+    def match_and_insert(self, model_traced, quantizer_desc):
+        for node in model_traced.graph.nodes:
+            if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
+                # Add quantizer to identity branch
+                print('node: ', node, node.name, node.args[0].name, node.args[1].name)
+                block_name_list = node.args[1].name.split('_')[:4]
+                # print(block_name_list)
+                block_name = '.'.join(block_name_list)
+                # print(block_name)
+                add1_res_quantizer_name = F"{block_name}.add1_residual_input_quantizer"
+                add1_res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(add1_res_quantizer_name, add1_res_quantizer)
+
+                add1_local_quantizer_name = F"{block_name}.add1_local_input_quantizer"
+                add1_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(add1_local_quantizer_name, add1_local_quantizer)
+
+                # insert quantizer to add
+                fx_utils.add_quantizer(node, model_traced, [0, 1], [add1_res_quantizer_name, add1_local_quantizer_name])
+
 class FTSWINResAdd1TypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(FTSWINResAdd1TypePatternMatcher, self).__init__()
@@ -393,6 +421,34 @@ class FTSWINNorm1TypePatternMatcher(PatternMatcher):
                 norm1_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(norm1_quantizer_name, norm1_quantizer)
                 fx_utils.add_quantizer(node.args[0], model_traced, [0], [norm1_quantizer_name])
+
+class FTSWINFirstResAdd2TypePatternMatcher(PatternMatcher):
+    def __init__(self):
+        super(FTSWINFirstResAdd2TypePatternMatcher, self).__init__()
+        self.pattern = FTSWINFirstResAdd2TypePattern()
+        self.pattern_graph = fx_utils.FTSWINLowerQuantOpTracer().trace(self.pattern)
+        self.pattern_graph.print_tabular()
+        self.pattern_traced = fx.GraphModule(self.pattern, self.pattern_graph)
+
+    def match_and_insert(self, model_traced, quantizer_desc):
+        for node in model_traced.graph.nodes:
+            if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
+                # Add quantizer to identity branch
+                print('node: ', node, node.name, node.args[0].name, node.args[1].name)
+                block_name_list = node.args[1].name.split('_')[:4]
+                # print(block_name_list)
+                block_name = '.'.join(block_name_list)
+                # print(block_name)
+                add2_res_quantizer_name = F"{block_name}.add2_residual_input_quantizer"
+                add2_res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(add2_res_quantizer_name, add2_res_quantizer)
+
+                add2_local_quantizer_name = F"{block_name}.add2_local_input_quantizer"
+                add2_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
+                model_traced.add_submodule(add2_local_quantizer_name, add2_local_quantizer)
+
+                # insert quantizer to add
+                fx_utils.add_quantizer(node, model_traced, [0, 1], [add2_res_quantizer_name, add2_local_quantizer_name])
 
 class FTSWINResAdd2TypePatternMatcher(PatternMatcher):
     def __init__(self):

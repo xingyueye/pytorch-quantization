@@ -4,7 +4,8 @@ from pytorch_quantization import nn as quant_nn
 __all__ = ['ConvBnResReluTypePattern', 'SEReLUTypePattern','SESiLUTypePattern', 'DropActDropPathAddTypePattern',
            'MeanTypePattern', 'SEAvgPoolTypePattern', 'HardSigmoidTypePattern', 'BERTQueryKeyTypePattern', 'BERTAttnOutTypePattern',
            'BERTResAddTypePattern', 'FTSWINQKMatmulTypePattern','FTSWINAVMatmulTypePattern','FTSWINSoftmaxTypePattern',
-           'FTSWINResAdd1TypePattern', 'FTSWINNorm1TypePattern', 'FTSWINResAdd2TypePattern', 'FTSWINNorm2TypePattern']
+           'FTSWINFirstResAdd1TypePattern', 'FTSWINResAdd1TypePattern', 'FTSWINNorm1TypePattern', 'FTSWINFirstResAdd2TypePattern',
+           'FTSWINResAdd2TypePattern', 'FTSWINNorm2TypePattern']
 
 """For residual add block of resnet"""
 class ConvBnResReluTypePattern(torch.nn.Module):
@@ -193,6 +194,17 @@ class FTSWINNorm1TypePattern(torch.nn.Module):
         x = x.view(B, 14, 14, C)
         return x
 
+"""FirstResAdd1 of FTSwin"""
+class FTSWINFirstResAdd1TypePattern(torch.nn.Module):
+    def __init__(self,):
+        super().__init__()
+        self.identity = torch.nn.Identity()
+
+    def forward(self, x, shortcut):
+        B, L, C = x.shape
+        x = shortcut + self.identity(x.view(B,14,14,C))
+        return x
+
 """ResAdd1 of FTSwin"""
 class FTSWINResAdd1TypePattern(torch.nn.Module):
     def __init__(self,):
@@ -205,6 +217,17 @@ class FTSWINResAdd1TypePattern(torch.nn.Module):
         x = shortcut + self.drop_path(x.view(B,14,14,C))
         return x
 
+"""FirstResAdd2 of FTSwin"""
+class FTSWINFirstResAdd2TypePattern(torch.nn.Module):
+    def __init__(self, ):
+        super().__init__()
+        from timm.models.layers import Mlp
+        self.identity = torch.nn.Identity()
+        self.mlp = Mlp(128,128,128)
+
+    def forward(self, x, shortcut):
+        x = shortcut + self.identity(self.mlp(x))
+        return x
 
 """ResAdd2 of FTSwin"""
 class FTSWINResAdd2TypePattern(torch.nn.Module):
