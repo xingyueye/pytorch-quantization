@@ -129,33 +129,24 @@ class FTSWINModelQuantizer(ModelQuantizer):
         super(FTSWINModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
 
     def _quant_model_init(self, model, config, calib_weights):
+        self.swin_buffer = dict()
+        # record buffer from origin model, because we will lose buffer name after torch.fx trace
+        for name, buffer in model.buffers():
+            self.swin_buffer[name] = buffer
         return quant_model_init(model, config, calib_weights, type_str='FTSWIN', do_trace=True)
 
     def disable_quantizer_by_name(self, quantizer_name_list):
         set_quantizer_by_name(self.model, quantizer_name_list, _disabled=True)
 
-    def fuse_qkv(self,):
-        """Adjust quantization ranges to match an implementation where the QKV projections are implemented with a single GEMM.
-        Force the weight and output scale factors to match by taking the max of (Q,K,V).
-        """
-
-        def fuse3(qq, qk, qv):
-            if not hasattr(qq, '_amax') or not hasattr(qk, '_amax') or not hasattr(qv, '_amax'):
-                logger.warn('missing amax buffer, unable to fuse')
-                return
-            q = qq._amax.detach().item()
-            k = qk._amax.detach().item()
-            v = qv._amax.detach().item()
-
-            amax = max(q, k, v)
-            qq._amax.fill_(amax)
-            qk._amax.fill_(amax)
-            qv._amax.fill_(amax)
-            logger.info(f'          q={q:7.4f} k={k:7.4f} v={v:7.4f} -> {amax:7.4f}')
-
-        for name, mod in self.model.named_modules():
-            if name.endswith('.attention.self'):
-                print(name)
-                fuse3(mod.matmul_q_input_quantizer, mod.matmul_k_input_quantizer, mod.matmul_v_input_quantizer)
-                fuse3(mod.query._weight_quantizer, mod.key._weight_quantizer, mod.value._weight_quantizer)
-                fuse3(mod.query._aftergemm_quantizer, mod.key._aftergemm_quantizer, mod.value._aftergemm_quantizer)
+    def _save_calib_weights(self):
+        if not self.calib_weights:
+            self.calib_weights = "{}_calib_{}_w{}a{}_{}.pth.tar".format(self.model_name,
+                                                          self.quant_config.calib_data_nums,
+                                                          self.quant_config.w_qscheme.bit,
+                                                          self.quant_config.a_qscheme.bit,
+                                                          self.quant_config.a_qscheme.quantizer_type)
+        # save_calib_model(self.calib_weights, self.model)
+        state_dict = self.model.state_dict()
+        for name, buffer in self.swin_buffer.items():
+            state_dict[name] = buffer
+        torch.save({'model':state_dict}, self.calib_weights)
