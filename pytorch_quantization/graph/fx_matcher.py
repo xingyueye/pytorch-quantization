@@ -530,8 +530,10 @@ class FTSWINPatternMatcher(InstPatternMatcher):
         self.pattern_matchers.append(FTSWINQKMatmulTypePatternMatcher())
         self.pattern_matchers.append(FTSWINAVMatmulTypePatternMatcher())
         self.pattern_matchers.append(FTSWINSoftmaxTypePatternMatcher())
+        self.pattern_matchers.append(FTSWINFirstResAdd1TypePatternMatcher())
         self.pattern_matchers.append(FTSWINResAdd1TypePatternMatcher())
         self.pattern_matchers.append(FTSWINNorm1TypePatternMatcher())
+        self.pattern_matchers.append(FTSWINFirstResAdd2TypePatternMatcher())
         self.pattern_matchers.append(FTSWINResAdd2TypePatternMatcher())
         self.pattern_matchers.append(FTSWINNorm2TypePatternMatcher())
 
