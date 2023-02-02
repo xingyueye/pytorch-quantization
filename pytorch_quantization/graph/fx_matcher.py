@@ -261,6 +261,11 @@ class BERTResAddTypePatternMatcher(PatternMatcher):
 
                 fx_utils.add_quantizer(node, model_traced, [0, 1], [out_quantizer_name, res_quantizer_name])
 
+def _ftswin_get_block_name(node):
+    while (node.op != 'call_module'):
+        node = node.args[0]
+    return node.name
+
 class FTSWINQKMatmulTypePatternMatcher(PatternMatcher):
     def __init__(self):
         super(FTSWINQKMatmulTypePatternMatcher, self).__init__()
@@ -274,12 +279,18 @@ class FTSWINQKMatmulTypePatternMatcher(PatternMatcher):
             if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
                 # Add quantizer to identity branch
                 print('node: ', node, node.name, node.args[0].name, node.args[1].name)
+                block_name = _ftswin_get_block_name(node)
+                block_name_list = block_name.split('_')[:5]
+                # print(block_name_list)
+                # print('.'.join(node.args[1].name.split('.')))
+                block_name = '.'.join(block_name_list)
+                # print(block_name)
 
-                query_quantizer_name = F"{'.'.join(node.name.split('.'))}.matmul_q_input_quantizer"
+                query_quantizer_name = F"{block_name}.matmul_q_input_quantizer"
                 query_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(query_quantizer_name, query_quantizer)
 
-                key_quantizer_name = F"{'.'.join(node.name.split('.'))}.matmul_k_input_quantizer"
+                key_quantizer_name = F"{block_name}.matmul_k_input_quantizer"
                 key_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(key_quantizer_name, key_quantizer)
 
@@ -298,12 +309,15 @@ class FTSWINAVMatmulTypePatternMatcher(PatternMatcher):
             if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
                 # Add quantizer to identity branch
                 print('node: ', node, node.name, node.args[0].name, node.args[1].name)
-
-                attn_quantizer_name = F"{'.'.join(node.name.split('.'))}.matmul_a_input_quantizer"
+                block_name_list = node.args[0].name.split('_')[:5]
+                # print(block_name_list)
+                block_name = '.'.join(block_name_list)
+                # print(block_name)
+                attn_quantizer_name = F"{block_name}.matmul_a_input_quantizer"
                 attn_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(attn_quantizer_name, attn_quantizer)
 
-                value_quantizer_name = F"{'.'.join(node.name.split('.'))}.matmul_v_input_quantizer"
+                value_quantizer_name = F"{block_name}.matmul_v_input_quantizer"
                 value_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(value_quantizer_name, value_quantizer)
 
@@ -322,8 +336,12 @@ class FTSWINSoftmaxTypePatternMatcher(PatternMatcher):
             if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
                 # Add quantizer to identity branch
                 print('node: ', node, node.name, node.args[0].name)
-
-                softmax_quantizer_name = F"{'.'.join(node.name.split('.'))}.softmax_input_quantizer"
+                block_name_list = node.name.split('_')[:5]
+                # print(block_name_list)
+                # print('.'.join(node.args[1].name.split('.')))
+                block_name = '.'.join(block_name_list)
+                # print(block_name)
+                softmax_quantizer_name = F"{block_name}.softmax_input_quantizer"
                 softmax_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(softmax_quantizer_name, softmax_quantizer)
 
@@ -342,12 +360,15 @@ class FTSWINResAdd1TypePatternMatcher(PatternMatcher):
             if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
                 # Add quantizer to identity branch
                 print('node: ', node, node.name, node.args[0].name)
-
-                add1_res_quantizer_name = F"{'.'.join(node.name.split('.'))}.add1_residual_input_quantizer"
+                block_name_list = node.args[1].name.split('_')[:4]
+                # print(block_name_list)
+                block_name = '.'.join(block_name_list)
+                # print(block_name)
+                add1_res_quantizer_name = F"{block_name}.add1_residual_input_quantizer"
                 add1_res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(add1_res_quantizer_name, add1_res_quantizer)
 
-                add1_local_quantizer_name = F"{'.'.join(node.name.split('.'))}.add1_local_input_quantizer"
+                add1_local_quantizer_name = F"{block_name}.add1_local_input_quantizer"
                 add1_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(add1_local_quantizer_name, add1_local_quantizer)
 
@@ -368,7 +389,7 @@ class FTSWINNorm1TypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.name, node.args[0].name)
 
                 # insert quantizer to layernorm
-                norm1_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm_input1_quantizer"
+                norm1_quantizer_name = F"{'.'.join(node.args[0].name.split('_'))}.layernorm_input1_quantizer"
                 norm1_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(norm1_quantizer_name, norm1_quantizer)
                 fx_utils.add_quantizer(node.args[0], model_traced, [0], [norm1_quantizer_name])
@@ -385,13 +406,16 @@ class FTSWINResAdd2TypePatternMatcher(PatternMatcher):
         for node in model_traced.graph.nodes:
             if fx_utils.end_node_a_matches_graph_b_types(node, model_traced, self.pattern_graph, self.pattern_traced):
                 # Add quantizer to identity branch
-                print('node: ', node, node.name, node.args[0].name)
-
-                add2_res_quantizer_name = F"{'.'.join(node.name.split('.'))}.add2_residual_input_quantizer"
+                print('node: ', node, node.name, node.args[0].name, node.args[1].name)
+                block_name_list = node.args[1].name.split('_')[:4]
+                # print(block_name_list)
+                block_name = '.'.join(block_name_list)
+                # print(block_name)
+                add2_res_quantizer_name = F"{block_name}.add2_residual_input_quantizer"
                 add2_res_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(add2_res_quantizer_name, add2_res_quantizer)
 
-                add2_local_quantizer_name = F"{'.'.join(node.name.split('.'))}.add2_local_input_quantizer"
+                add2_local_quantizer_name = F"{block_name}.add2_local_input_quantizer"
                 add2_local_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(add2_local_quantizer_name, add2_local_quantizer)
 
@@ -414,7 +438,7 @@ class FTSWINNorm2TypePatternMatcher(PatternMatcher):
                 print('node: ', node, node.name, node.args[0].name)
 
                 # insert quantizer to layernorm
-                norm2_quantizer_name = F"{'.'.join(node.name.split('.'))}.layernorm_input2_quantizer"
+                norm2_quantizer_name = F"{'.'.join(node.args[0].name.split('_'))}.layernorm_input2_quantizer"
                 norm2_quantizer = FX_TENSOR_QUANT_MAP[quantizer_desc.quantizer_type](quantizer_desc)
                 model_traced.add_submodule(norm2_quantizer_name, norm2_quantizer)
                 fx_utils.add_quantizer(node.args[0], model_traced, [0], [norm2_quantizer_name])

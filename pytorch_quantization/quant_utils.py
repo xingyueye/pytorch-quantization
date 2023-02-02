@@ -46,8 +46,7 @@ def set_quantizer_by_name(model, names, **kwargs):
         if name.endswith('_quantizer'):
             for n in names:
                 if re.search(n, name):
-                    s = f'Warning: changing {name}'
+                    print('Disable quantizer {}'.format(name))
                     for k, v in kwargs.items():
-                        s += (f' {k}={v}')
                         setattr(mod, k, v)
 
