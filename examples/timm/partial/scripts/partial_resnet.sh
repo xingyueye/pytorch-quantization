@@ -15,7 +15,7 @@ do
                                       --pretrained \
                                       --val-split val
 
-    CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
+  CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                       --master_port 12346 train.py  \
                                       $IMAGENET \
                                       -b 32 \
@@ -25,7 +25,7 @@ do
                                       --partial \
                                       --partial_dump \
                                       --quant_config partial/configs/mpq_config.yaml \
-                                      --pretrained_calib ${MODEL}_calib_128_w8a8_naive.pt
+                                      --pretrained_calib ${MODEL}_calib_128_w8a8_naive.pt \
                                       --val-split val \
                                       --export
 
