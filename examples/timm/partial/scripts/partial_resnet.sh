@@ -27,6 +27,7 @@ do
                                       --quant_config partial/configs/mpq_config.yaml \
                                       --pretrained_calib ${MODEL}_calib_128_w8a8_naive.pt \
                                       --val-split val \
-                                      --export
+                                      --export \
+                                      --export-batch-size 4
 
 done

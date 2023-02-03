@@ -315,6 +315,7 @@ parser.add_argument('--partial_dump', action='store_true', default=False, help='
 parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml', help='Output directory to save calibrated model')
 parser.add_argument('--pretrained_calib', type=str, default='', help='Pretrained model')
 parser.add_argument('--export', action='store_true', default=False, help='Enable calibration')
+parser.add_argument('--export-batch-size', type=int, default=4, help='ONNX export batch size')
 
 # Distillation parameters
 parser.add_argument('--teacher-model', default='tf_efficientnet_b0', type=str, metavar='MODEL',
@@ -704,7 +705,7 @@ def main():
         return
 
     if args.export:
-        data_shape = (args.batch_size,) + data_config['input_size']
+        data_shape = (args.export_batch_size,) + data_config['input_size']
         quantizer.export_onnx(data_shape)
         return
 

@@ -11,4 +11,6 @@ CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                     --calib \
                                     --quant_config ptq/configs/mpq_config.yaml \
                                     --pretrained \
-                                    --val-split val
+                                    --val-split val \
+                                    --export \
+                                    --export-batch-size 4

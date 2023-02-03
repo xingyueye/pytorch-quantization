@@ -42,7 +42,7 @@ parser.add_argument('--num-classes', type=int, default=None,
 parser.add_argument('--output', type=str, default='./',
                     help='output directory of results')
 
-parser.add_argument('--quant_config', type=str, default='./mpq_partial_config.yaml',
+parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml',
                     help='quantzaiton configuration')
 parser.add_argument('--calib_weight', type=str, default=None,
                     help='calib weight')
