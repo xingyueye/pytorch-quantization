@@ -134,7 +134,7 @@ class FTSWINModelQuantizer(ModelQuantizer):
     def _quant_model_init(self, model, config, calib_weights):
         self.swin_buffer = dict()
         # record buffer from origin model, because we will lose buffer name after torch.fx trace
-        for name, buffer in model.buffers():
+        for name, buffer in model.named_buffers():
             self.swin_buffer[name] = buffer
         return quant_model_init(model, config, calib_weights, type_str='FTSWIN', do_trace=True)
 
