@@ -642,7 +642,7 @@ def main():
     if args.partial:
         if quantizer.quant_config.partial_ptq.sensitivity_method == 'top1':
             dataset_mini = create_dataset(
-                root=args.data,
+                root=args.data_dir,
                 name=args.dataset,
                 split="val_mini",
                 download=args.dataset_download)
@@ -650,7 +650,7 @@ def main():
             loader_mini = create_loader(
                 dataset_mini,
                 input_size=data_config['input_size'],
-                batch_size=args.eval_batch_size,
+                batch_size=args.validation_batch_size or args.batch_size,
                 use_prefetcher=True,
                 interpolation=data_config['interpolation'],
                 mean=data_config['mean'],
@@ -698,11 +698,14 @@ def main():
 
     if args.partial:
         if args.local_rank == 0:
-            skip_layers, ori_acc, ptq_acc, partial_acc, sens_method = quantizer.partial_quant(loader_eval, args.batch_size, mini_eval_loader=loader_mini)
+            def validate_partial(loader_eval, model, validate_loss_fn=validate_loss_fn, args=args, amp_autocast=amp_autocast):
+                validate(model,  loader_eval, validate_loss_fn, args, amp_autocast)
+            skip_layers, ori_acc, ptq_acc, partial_acc, sens_method = quantizer.partial_quant(loader_eval, validate_partial, mini_eval_loader=loader_mini)
             if args.partial_dump:
                 write_results('{}_partial_results.txt'.format(args.model), ori_acc, ptq_acc, partial_acc, skip_layers, sens_method)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
-        return
+        if not args.export:
+            return
 
     if args.export:
         data_shape = (args.export_batch_size,) + data_config['input_size']
