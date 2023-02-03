@@ -1,21 +1,3 @@
-#
-# SPDX-FileCopyrightText: Copyright (c) 1993-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-
 """Quantized Linear"""
 import torch
 from torch import nn
@@ -28,20 +10,22 @@ from . import _utils
 __all__ = ["QuantLinearFT"]
 
 class QuantLinearFT(nn.Linear, _utils.QuantGemmMixin):
-    """Quantized version of nn.Linear
+    """FasterTransformer Quantized version of nn.Linear
 
-    Apply quantized linear to the incoming data, y = dequant(quant(x)quant(A)^T + b).
+    Apply quantized linear to the incoming data, y = dequant(quant(x)quant(A)^T) + b.
 
-    Keep Module name "Linear" instead of "QuantLinear" so that it can be easily dropped into preexisting model and load
-    pretrained weights. An alias "QuantLinear" is defined below. The base code is a copy of nn.Linear, see detailed
+    Keep Module name "LinearFT" instead of "QuantLinearFT" so that it can be easily dropped into preexisting model and load
+    pretrained weights. An alias "QuantLinearFT" is defined below. The base code is a copy of nn.Linear, see detailed
     comment of original arguments there.
 
-    Quantization descriptors are passed in in kwargs. If not presents, default_quant_desc_input and
-    default_quant_desc_weight are used.
+    Quantization descriptors are passed in in kwargs. If not presents, default_quant_desc_input
+    and default_quant_desc_output and default_quant_desc_weight are used.
 
     Keyword Arguments:
         quant_desc_input: An instance of :class:`QuantDescriptor <pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of input.
+        quant_desc_output: An instance of :class:`QuantDescriptor <pytorch_quantization.tensor_quant.QuantDescriptor>`.
+            Quantization descriptor of output.
         quant_desc_wegiht: An instance of :class:`QuantDescriptor <pytorch_quantization.tensor_quant.QuantDescriptor>`.
             Quantization descriptor of weight.
 
@@ -51,10 +35,12 @@ class QuantLinearFT(nn.Linear, _utils.QuantGemmMixin):
 
     Readonly properties:
         - input_quantizer:
+        - ouptut_quantizer:
         - weight_quantizer:
 
     Static methods:
         - set_default_quant_desc_input: Set default_quant_desc_input
+        - set_default_quant_desc_output: Set default_quant_desc_output
         - set_default_quant_desc_weight: Set default_quant_desc_weight
     """
 
