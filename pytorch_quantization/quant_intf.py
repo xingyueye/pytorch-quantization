@@ -2,10 +2,7 @@ import yaml
 from easydict import EasyDict
 from tqdm import tqdm
 
-# import torch
-# import torch.nn as nn
-# from pytorch_quantization import nn as quant_nn
-from pytorch_quantization import calib
+# from pytorch_quantization import calib
 from pytorch_quantization.tensor_quant import QuantDescriptor
 from pytorch_quantization.quant_utils import set_module
 from pytorch_quantization.quant_fx import insert_qdq_nodes_via_subgraph_match
@@ -108,12 +105,12 @@ def compute_amax(model, **kwargs):
     for name, module in model.named_modules():
         if isinstance(module, quant_nn.TensorQuantizer):
             if module._calibrator is not None:
-                #MinMaxCalib
-                if isinstance(module._calibrator, calib.MaxCalibrator):
-                    module.load_calib_amax()
-                else:
-                #HistogramCalib
-                    module.load_calib_amax(**kwargs)
+                # #MinMaxCalib
+                # if isinstance(module._calibrator, calib.MaxCalibrator):
+                #     module.load_calib_amax()
+                # else:
+                # #HistogramCalib
+                module.load_calib_amax(**kwargs)
             print(F"{name:40}: {module}")
     model.cuda()
 

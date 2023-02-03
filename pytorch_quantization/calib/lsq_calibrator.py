@@ -89,7 +89,7 @@ class LSQCalibrator(_Calibrator):
         """Reset the collected absolute max"""
         self._calib_amax = None
 
-    def compute_amax(self):
+    def compute_amax(self, *args, **kwargs):
         """Return the absolute max of all tensors collected"""
         return self._calib_amax
 

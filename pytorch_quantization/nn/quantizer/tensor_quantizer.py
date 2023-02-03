@@ -21,7 +21,7 @@ from absl import logging
 import torch
 from torch import nn
 
-from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant, lsq_fake_tensor_quant, lsq_plus_fake_tensor_quant
+from pytorch_quantization.tensor_quant import QuantDescriptor, tensor_quant, fake_tensor_quant
 from pytorch_quantization.nn.modules.clip import Clip
 # from pytorch_quantization.nn.modules.grad_scale import GradScale
 

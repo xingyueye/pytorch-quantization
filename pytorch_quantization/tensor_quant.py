@@ -24,7 +24,6 @@ from absl import logging
 import torch
 import torch.nn as nn
 from torch.autograd import Function
-from pytorch_quantization.nn.functional import GradScaleFunction
 
 class ScaledQuantDescriptor():
     """Supportive descriptor of quantization
@@ -698,4 +697,3 @@ fake_tensor_quant = FakeTensorQuantFunction.apply
 lsq_fake_tensor_quant = LSQFakeTensorQuantFunction.apply
 lsq_plus_fake_tensor_quant = LSQPLUSFakeTensorQuantFunction.apply
 fake_affine_tensor_quant = FakeAffineTensorQuantFunction.apply
-balance_grad_for_scale = GradScaleFunction.apply
