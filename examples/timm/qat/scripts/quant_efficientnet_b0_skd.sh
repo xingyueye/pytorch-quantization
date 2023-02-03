@@ -7,7 +7,7 @@ CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                     --model efficientnet_b0 \
                                     --quant \
                                     --calib \
-                                    --quant_config configs/mpq_config_efficientnet.yaml \
+                                    --quant_config qat/configs/mpq_config_efficientnet.yaml \
                                     --pretrained \
                                     --val-split val \
                                     --input-size 3 224 224
@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc
                                     /mnt/beegfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012/ \
                                     --model efficientnet_b0 \
                                     --quant \
-                                    --quant_config configs/mpq_config_efficientnet.yaml \
+                                    --quant_config qat/configs/mpq_config_efficientnet.yaml \
                                     --pretrained_calib efficientnet_b0_calib_128_w8a8_naive.pt \
                                     -b 128 \
                                     --sched step \
