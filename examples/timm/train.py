@@ -699,10 +699,11 @@ def main():
     if args.partial:
         if args.local_rank == 0:
             def validate_partial(loader_eval, model, validate_loss_fn=validate_loss_fn, args=args, amp_autocast=amp_autocast):
-                validate(model,  loader_eval, validate_loss_fn, args, amp_autocast)
+                metrics = validate(model,  loader_eval, validate_loss_fn, args, amp_autocast)
+                return metrics['top1']
             skip_layers, ori_acc, ptq_acc, partial_acc, sens_method = quantizer.partial_quant(loader_eval, validate_partial, mini_eval_loader=loader_mini)
             if args.partial_dump:
-                write_results('{}_partial_results.txt'.format(args.model), ori_acc, ptq_acc, partial_acc, skip_layers, sens_method)
+                write_results('{}_partial_results.txt'.format(args.model), args.model, ori_acc, ptq_acc, partial_acc, skip_layers, sens_method)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
         if not args.export:
             return

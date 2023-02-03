@@ -246,11 +246,15 @@ def quant_model_calib_bert(model, data_loader, config, batch_size, predict):
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
 def quant_model_export(model, onnx_path, data_shape):
+    model.eval()
+    model.cuda()
     quant_nn.TensorQuantizer.use_fb_fake_quant = True
     imgs = torch.randn(data_shape).cuda()
-    torch.onnx.export(model, imgs, onnx_path,
-                        input_names=['input'],
-                        output_names=['output'],
-                        verbose=False,
-                        opset_version=13,
-                        operator_export_type=torch.onnx.OperatorExportTypes.ONNX)
+    model_traced = torch.jit.trace(model, imgs)
+    torch.onnx.export(model_traced, imgs, onnx_path,
+                      input_names=['input'],
+                      output_names=['output'],
+                      verbose=False,
+                      opset_version=13,
+                      do_constant_folding=True,
+                      operator_export_type=torch.onnx.OperatorExportTypes.ONNX)
