@@ -40,7 +40,8 @@ from timm.utils import ApexScaler, NativeScaler
 from torch.nn import functional as F
 
 # from pytorch_quantization.quant_intf import quant_model_init, quant_model_calib_timm, save_calib_model
-from pytorch_quantization.model_quantizer import TimmModelQuantizer as ModelQuantizer
+# from pytorch_quantization.model_quantizer import TimmModelQuantizer as ModelQuantizer
+from pytorch_quantization.model_quantizer import ModelQuantizerFactory
 
 try:
     from apex import amp
@@ -306,9 +307,12 @@ parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
 
 # Quantization parameters
+parser.add_argument('--quantizer', type=str, default='Timm', help='ModelQuantizer', choices=['Timm', 'FTSWIN'])
 parser.add_argument('--quant', action='store_true', default=False, help='Enable quantization')
 parser.add_argument('--calib', action='store_true', default=False, help='Enable calibration')
-parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml', help='Output d irectory to save calibrated model')
+parser.add_argument('--partial', action='store_true', default=False, help='Enable partial quantization')
+parser.add_argument('--partial_dump', action='store_true', default=False, help='Dump results of partial quantization')
+parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml', help='Output directory to save calibrated model')
 parser.add_argument('--pretrained_calib', type=str, default='', help='Pretrained model')
 parser.add_argument('--export', action='store_true', default=False, help='Enable calibration')
 
@@ -338,6 +342,17 @@ def _parse_args():
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
     return args, args_text
 
+def write_results(filename, arch, ori_acc, ptq_acc, partial_acc=None, skip_layers=None, method='mse'):
+    with open(filename, mode='w') as cf:
+        cf.write("{}".format(method) + '\n')
+        cf.write(arch + '\n')
+        cf.write(str(ori_acc) + '\n')
+        cf.write(str(ptq_acc) + '\n')
+        if partial_acc is not None:
+            cf.write(str(partial_acc) + '\n')
+        if skip_layers is not None:
+            for layer in skip_layers:
+                cf.write(layer + '\n')
 
 def main():
     # setup_default_logging(default_level=logging.ERROR)
@@ -446,35 +461,14 @@ def main():
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
     if args.quant:
-        quantizer = ModelQuantizer(args.model, model, args.quant_config, calib_weights='' if args.calib else args.pretrained_calib)
+        quantizer = ModelQuantizerFactory.get_model_quantizer(args.quantizer,
+                                                              args.model,
+                                                              model,
+                                                              args.quant_config,
+                                                              calib_weights='' if args.calib else args.pretrained_calib)
         print(model)
         model = quantizer.model
-        # model, config = quant_model_init(model, config_file=args.quant_config, calib_weights=args.pretrained_calib)
-        # if args.use_lsq:
-        #     init_func = lsq_plus_qat_init_model_manu if args.lsq_type=='lsq_plus' else lsq_qat_init_model_manu
-        #     init_func(model, args.bit_w, args.bit_a, lsq_type=args.lsq_type)           # using lsq_qat
-            
-            # if not args.calib and args.pretrained_calib:
-            #     state_dict = torch.load(args.pretrained_calib, map_location='cpu')
-            #     model.load_state_dict(state_dict['model'].state_dict())
-            #     # model.load_state_dict(state_dict)
-            #     lsq_init(model)                          # using lsq_qat
-            # elif not args.calib:
-            #     _logger.error('Please provide correct calib file to init Quantizer or Process calibration !!!')
-            #     return
-        # else:
-        #     qat_init_model_manu(model, args.bit_w, args.bit_a)
 
-        # lsq_qat_init_model_manu(model)           # using lsq_qat
-        # sensitive_layers_apply_lsq(model)
-        # if args.skip_layers:
-        #     skip_sensitive_layers(model)
-        # if args.freeze_layers:
-        #     freeze_specified_layers(model)
-        # if args.use_lsq:
-        #     lsq_init(model)                          # using lsq_qat
-        # sensitive_layers_enable_lsq(model)
-        # model.to(self.device)
 
     # move model to GPU, enable channels last layout if set
     model.cuda()
@@ -644,6 +638,29 @@ def main():
         pin_memory=args.pin_mem,
     )
 
+    if args.partial:
+        if quantizer.quant_config.partial_ptq.sensitivity_method == 'top1':
+            dataset_mini = create_dataset(
+                root=args.data,
+                name=args.dataset,
+                split="val_mini",
+                download=args.dataset_download)
+
+            loader_mini = create_loader(
+                dataset_mini,
+                input_size=data_config['input_size'],
+                batch_size=args.eval_batch_size,
+                use_prefetcher=True,
+                interpolation=data_config['interpolation'],
+                mean=data_config['mean'],
+                std=data_config['std'],
+                num_workers=args.workers,
+                crop_pct=data_config['crop_pct'],
+                pin_memory=False,
+                tf_preprocessing=False)
+        else:
+            load_mini = None
+
     # setup loss function
     if args.jsd_loss:
         assert num_aug_splits > 1  # JSD only valid with aug splits set
@@ -675,6 +692,14 @@ def main():
             quantizer.calibration(loader_train, args.batch_size, save_calib_model=True)
             # quant_model_calib_timm(model, loader_train, config, args.batch_size)
             # quantizer.save_calib_model(args.model, model, config)
+        validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
+        return
+
+    if args.partial:
+        if args.local_rank == 0:
+            skip_layers, ori_acc, ptq_acc, partial_acc, sens_method = quantizer.partial_quant(loader_eval, args.batch_size, mini_eval_loader=loader_mini)
+            if args.partial_dump:
+                write_results('{}_partial_results.txt'.format(args.model), ori_acc, ptq_acc, partial_acc, skip_layers, sens_method)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
         return
 

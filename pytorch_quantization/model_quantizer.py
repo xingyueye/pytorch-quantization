@@ -51,6 +51,9 @@ class ModelQuantizer:
     def quant_disable(self):
         model_quant_disable(self.model)
 
+    def disable_quantizer_by_name(self, quantizer_name_list):
+        set_quantizer_by_name(self.model, quantizer_name_list, _disabled=True)
+
     def export(self):
         pass
 
@@ -90,9 +93,9 @@ class TimmModelQuantizer(ModelQuantizer):
                                                          ptq_acc,
                                                          self.quant_config.partial_ptq.drop)
 
-            return skip_layers, ori_acc, partial_acc, self.quant_config.partial_ptq.sensitivity_method
+            return skip_layers, ori_acc, ptq_acc, partial_acc, self.quant_config.partial_ptq.sensitivity_method
         else:
-            return [], ori_acc, ptq_acc, 'None'
+            return [], ori_acc, ptq_acc, 'None', 'None'
 
     def export_onnx(self, data_shape):
         onnx_path = self.calib_weights.replace(".pt", "_qat.onnx")
@@ -101,7 +104,7 @@ class TimmModelQuantizer(ModelQuantizer):
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 
 
-class MMlabModelQuantizer(ModelQuantizer):
+class MMLabModelQuantizer(ModelQuantizer):
     NotImplementedError
     # def calibration(self, data_loader, batch_size, save_calib_model=False):
     #     quant_model_calib_mmlab(self.model, data_loader, self.quant_config, batch_size)
@@ -135,8 +138,12 @@ class FTSWINModelQuantizer(ModelQuantizer):
             self.swin_buffer[name] = buffer
         return quant_model_init(model, config, calib_weights, type_str='FTSWIN', do_trace=True)
 
-    def disable_quantizer_by_name(self, quantizer_name_list):
-        set_quantizer_by_name(self.model, quantizer_name_list, _disabled=True)
+
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
+        quant_model_calib_timm(self.model, data_loader, self.quant_config, batch_size, custom_predict)
+        self.disable_quantizer_by_name(['layernorm_input', 'softmax_input', 'local_input', 'residual_input'])
+        if save_calib_model:
+            self._save_calib_weights()
 
     def _save_calib_weights(self):
         if not self.calib_weights:
@@ -150,3 +157,10 @@ class FTSWINModelQuantizer(ModelQuantizer):
         for name, buffer in self.swin_buffer.items():
             state_dict[name] = buffer
         torch.save({'model':state_dict}, self.calib_weights)
+
+class ModelQuantizerFactory(object):
+    @classmethod
+    def get_model_quantizer(cls, type_str, *args, **kwargs):
+        valid_str_list = ['', 'Timm', 'MMLab', 'BERT', 'FTSWIN']
+        assert type_str in valid_str_list, 'Unsupported {}ModelQuantizer'.format(type_str)
+        return eval("{}ModelQuantizer".format(type_str))(*args, **kwargs)
