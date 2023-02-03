@@ -14,7 +14,7 @@ from timm.utils import accuracy, AverageMeter
 
 import sys
 
-sys.path.append("../../")
+sys.path.append("../../../")
 from pytorch_quantization import nn as quant_nn
 from pytorch_quantization.model_quantizer import TimmModelQuantizer
 
@@ -42,89 +42,12 @@ parser.add_argument('--num-classes', type=int, default=None,
 parser.add_argument('--output', type=str, default='./',
                     help='output directory of results')
 
-parser.add_argument('--quant_config', type=str, default='./partial_config.yaml',
+parser.add_argument('--quant_config', type=str, default='./mpq_partial_config.yaml',
                     help='quantzaiton configuration')
 parser.add_argument('--calib_weight', type=str, default=None,
                     help='calib weight')
 parser.add_argument('--save_onnx', action='store_true',
                     help='export to onnx')
-
-
-
-# def collect_stats(model, data_loader, num_batches):
-#     """Feed data to the network and collect statistic"""
-#
-#     # Enable calibrators
-#     for name, module in model.named_modules():
-#         if isinstance(module, quant_nn.TensorQuantizer):
-#             if module._calibrator is not None:
-#                 module.disable_quant()
-#                 module.enable_calib()
-#             else:
-#                 module.disable()
-#
-#     for i, (image, _) in tqdm(enumerate(data_loader), total=num_batches):
-#         model(image.cuda())
-#         if i >= num_batches:
-#             break
-#
-#     # Disable calibrators
-#     for name, module in model.named_modules():
-#         if isinstance(module, quant_nn.TensorQuantizer):
-#             if module._calibrator is not None:
-#                 module.enable_quant()
-#                 module.disable_calib()
-#             else:
-#                 module.enable()
-#
-#
-# def compute_amax(model, **kwargs):
-#     # Load calib result
-#     for name, module in model.named_modules():
-#         if isinstance(module, quant_nn.TensorQuantizer):
-#             if module._calibrator is not None:
-#                 if isinstance(module._calibrator, calib.MaxCalibrator):
-#                     module.load_calib_amax()
-#                 else:
-#                     module.load_calib_amax(**kwargs)
-#             print(F"{name:40}: {module}")
-#     model.cuda()
-#
-# def _load_calib_amax_mp(quantizer_list, **kwargs):
-#     for name, quantizer in quantizer_list:
-#         if quantizer._calibrator is not None:
-#             if isinstance(quantizer._calibrator, calib.MaxCalibrator):
-#                 quantizer.load_calib_amax()
-#             else:
-#                 quantizer.load_calib_amax(**kwargs)
-#
-# def compute_amax_mp(model, **kwargs):
-#     # collect Quantizer
-#     quantizer_list = list()
-#     for name, module in model.named_modules():
-#         if isinstance(module, quant_nn.TensorQuantizer):
-#             quantizer_list.append((name, module))
-#     print("Total Quantizers {}".format(len(quantizer_list)))
-#     co_workers = kwargs.pop('calib_workers', 10)
-#     worker_list = list()
-#     interval = len(quantizer_list) // co_workers
-#     for i in range(co_workers):
-#         start = i
-#         end = co_workers * interval
-#         worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start : end : co_workers],), kwargs=kwargs)
-#         worker_list.append(worker)
-#     remain = len(quantizer_list) % co_workers
-#     if remain > 0:
-#         start = co_workers * interval
-#         end = len(quantizer_list)
-#         worker = Process(target=_load_calib_amax_mp, args=(quantizer_list[start: end],), kwargs=kwargs)
-#         worker_list.append(worker)
-#
-#     for worker in worker_list:
-#         worker.start()
-#     for worker in worker_list:
-#         worker.join()
-#     model.cuda()
 
 
 class AverageMeter(object):
@@ -169,7 +92,7 @@ class ProgressMeter(object):
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 
-def validate_model(val_loader, model, device=None, print_freq=100):
+def validate_func(val_loader, model, device=None, print_freq=100):
     if device is None:
         device = next(model.parameters()).device
     else:
@@ -335,7 +258,7 @@ def main(args):
     if args.calib_weight is None:
         quantizer.calibration(train_loader, args.batch_size, save_calib_model=True)
 
-    skip_layers, ori_acc1, partial_acc1, sensitivity = quantizer.partial_quant(val_loader, validate_model, mini_eval_loader=mini_loader)
+    skip_layers, ori_acc1, partial_acc1, sensitivity = quantizer.partial_quant(val_loader, validate_func, mini_eval_loader=mini_loader)
 
     if len(skip_layers) > 0:
         suffix = "{}_pptq".format(sensitivity)
