@@ -84,6 +84,8 @@ cd examples/timm/
 sh qat/scripts/quant_efficientnet_b0_skd.sh
 ```
 
+More examples see [examples/timm/README.md](examples/timm/README.md) and [examples/huggingface/question_answering/README.md](examples/huggingface/question_answering/README.md).
+
 ### MPQ Architecture
 
 For beginners, one needs to play with Model Quantizer only. For developers, it is made easy enough to inherit the base classes for new features, e.g., Module Converter to support more operations, Pattern Matcher to track new graph patterns, and Tensor Quantizer to adopt novel quantization algorithms etc.
