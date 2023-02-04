@@ -218,10 +218,10 @@ class QuestionAnsweringTrainer(Trainer):
         # quant_trainer.configure_model(model_to_save, self.quant_trainer_args)
 
         output_model_file = os.path.join(output_dir, "bert_qa_calib_{}_w{}_a{}_{}_qat.onnx".
-                                         format(self.quant_config.calib_data_nums,
-                                                self.quant_config.w_qscheme.bit,
-                                                self.quant_config.a_qscheme.bit,
-                                                self.quant_config.a_qscheme.quantizer_type))
+                                         format(self.quantizer.quant_config.calib_data_nums,
+                                                self.quantizer.quant_config.w_qscheme.bit,
+                                                self.quantizer.quant_config.a_qscheme.bit,
+                                                self.quantizer.quant_config.a_qscheme.quantizer_type))
         logger.info(f"exporting model to {output_model_file}")
 
         axes = {0: "batch_size", 1: "seq_len"}
