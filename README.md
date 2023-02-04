@@ -78,7 +78,7 @@ sh examples/timm/ptq/scripts/ptq_resnet50.sh
 cd examples/timm/
 sh partial/scripts/partial_resnet.sh
 ```
-### QAT on MobileNet
+### QAT on EfficientNet
 ```bash
 cd examples/timm/
 sh qat/scripts/quant_efficientnet_b0_skd.sh

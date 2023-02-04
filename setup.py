@@ -53,7 +53,7 @@ with open(os.path.join(abspath, "pytorch_quantization/version.py"), "w") as f:
     f.write(F"__version__ = \"{version}\"")
 
 setup(
-    name="mpq",
+    name="meituan-pytorch-quantization",
     version=version,
     description="Meituan Pytorch quantization toolkit",
     packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
