@@ -1,4 +1,4 @@
-python3 run_qa.py \
+CUDA_VISIBLE_DEVICES=0 python3 run_qa.py \
   --model_name_or_path bert-base-uncased \
   --dataset_name squad.py \
   --max_seq_length 128 \
