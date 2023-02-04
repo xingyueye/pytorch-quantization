@@ -1,0 +1,11 @@
+CUDA_VISIBLE_DEVICES=0 python3 run_qa.py \
+  --model_name_or_path bert-base-uncased \
+  --config_name bert-base-uncased \
+  --tokenizer_name bert-base-uncased \
+  --dataset_name squad.py \
+  --max_seq_length 128 \
+  --doc_stride 32 \
+  --do_eval \
+  --save_onnx \
+  --pretrained_calib finetuned_int8/bert-base-uncased-lr4e-5-bs12-epoch2-GPU1/pytorch_model.bin \
+  --output_dir ./
