@@ -10,7 +10,7 @@ Meituan PyTorch Quantization (MPQ) is an Meituan initiative for accelerating ind
 
 ### Quantization Performance on Classical Models 
 
-MPQ Quantization performance is tested with a list of classical models that are mostly used in practice, such as ResNet, MobileNet, EfficientNet, Swin, Bert and YOLOv6. 
+MPQ Quantization performance is tested with a list of classical models that are mostly used in practice, such as ResNet, MobileNet, EfficientNet, Swin, Bert and YOLOv6. The average accuracy loss is 0.41% compared to their FP16 counterparts.
 
 ![Classical Models Accuracy](assets/sop_acc.png)
 
@@ -18,7 +18,7 @@ The following chart uses a batch size of 4, tested on NVIDIA Tesla T4 with Tenso
 
 ![QPS Classical Models](assets/sop_perf.png)
 
-All models enjoy a substantial QPS boost after quantization.
+All models enjoy a substantial QPS boost (58% on average) after quantization.
 
 ![Classical Models Relative Boost](assets/sop_rel_boost.png)
 
