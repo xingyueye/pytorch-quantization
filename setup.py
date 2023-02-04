@@ -75,6 +75,6 @@ setup(
     long_description=open("README.md", "r", encoding="utf-8").read(),
     url="https://github.com/meituan/meituan-pytorch-quantization",
     author="Meituan",
-    author_email="liqingyuan,liliang58@meituan.com",
+    author_email="liqingyuan,liliang58,huyiming03,zhangbo97@meituan.com",
     license="Apache 2.0",
 )

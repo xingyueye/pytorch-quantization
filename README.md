@@ -33,7 +33,7 @@ MPQ well supports timm models where the majority of them has a tolerable accurac
 ### Prerequisites
 
 - gcc 5.4+
-- python >=3.7
+- python >=3.6
 - torch>=1.9
 
 #### From Binaries (Recommended)
