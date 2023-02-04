@@ -53,9 +53,9 @@ with open(os.path.join(abspath, "pytorch_quantization/version.py"), "w") as f:
     f.write(F"__version__ = \"{version}\"")
 
 setup(
-    name="pytorch_quantization",
+    name="mpq",
     version=version,
-    description="NVIDIA Pytorch quantization toolkit",
+    description="Meituan Pytorch quantization toolkit",
     packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
@@ -73,8 +73,8 @@ setup(
     zip_safe=False,
 
     long_description=open("README.md", "r", encoding="utf-8").read(),
-    url="https://github.com/nvidia/tensorrt/tools/pytorch-quantization",
-    author="NVIDIA",
-    author_email="nvidia@nvidia.com",
+    url="https://github.com/meituan/meituan-pytorch-quantization",
+    author="Meituan",
+    author_email="liqingyuan,liliang58@meituan.com",
     license="Apache 2.0",
 )
