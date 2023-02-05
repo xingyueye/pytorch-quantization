@@ -217,7 +217,7 @@ class QuestionAnsweringTrainer(Trainer):
         model_to_save = model.module if hasattr(model, "module") else model
         # quant_trainer.configure_model(model_to_save, self.quant_trainer_args)
 
-        output_model_file = os.path.join(output_dir, "bert_qa_calib_{}_w{}_a{}_{}_qat.onnx".
+        output_model_file = os.path.join(output_dir, "bert_qa_calib_{}_w{}a{}_{}_qat.onnx".
                                          format(self.quantizer.quant_config.calib_data_nums,
                                                 self.quantizer.quant_config.w_qscheme.bit,
                                                 self.quantizer.quant_config.a_qscheme.bit,
