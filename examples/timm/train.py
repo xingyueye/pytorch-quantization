@@ -326,7 +326,7 @@ parser.add_argument('--export', action='store_true', default=False,
 parser.add_argument('--export-batch-size', type=int, default=4,
                     help='ONNX export batch size')
 # for dynamic batch size export, you can use --export-dynamic-axes="{'input': {0: 'batch'}, 'output': {0: 'batch'}}"
-parser.add_argument('--export-dynamic-axes', type=str, default=None,
+parser.add_argument('--export-dynamic-axes', type=str, default='None',
                     help='ONNX export dynamic axes')
 
 # Distillation parameters

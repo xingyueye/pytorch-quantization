@@ -30,7 +30,8 @@ do
                                       --val-split val \
                                       --validation-batch-size 100 \
                                       --export \
-                                      --export-batch-size 1
+                                      --export-batch-size 1 \
+                                      --export-dynamic-axes "{'input': {0: 'batch'}, 'output': {0: 'batch'}}"
 
 done
 MODEL_LIST='resnet50 resnet50d resnetrs50 resnext50_32x4d resnext50d_32x4d tv_resnet50'
