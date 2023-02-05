@@ -1,5 +1,5 @@
+import os
 import copy
-
 
 import logging
 import os.path
@@ -107,12 +107,60 @@ class TimmModelQuantizer(ModelQuantizer):
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 
 
+<<<<<<< HEAD
 class MMLabModelQuantizer(ModelQuantizer):
     NotImplementedError
     # def calibration(self, data_loader, batch_size, save_calib_model=False):
     #     quant_model_calib_mmlab(self.model, data_loader, self.quant_config, batch_size)
     #     if save_calib_model:
     #         self._save_calib_weights()
+=======
+class MMlabModelQuantizer(ModelQuantizer):
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
+        super(MMlabModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+
+    def _quant_model_init(self, model, config, calib_weights):
+        return quant_model_init_mmlab(model, config, calib_weights)
+
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
+        multi_task = hasattr(data_loader.dataset, 'cumulative_sizes')
+        batch_idx = None
+        if multi_task:
+            batch_idx = data_loader.dataset.__getattribute__('cumulative_sizes')
+            batch_idx = [i // data_loader.batch_size for i in batch_idx]
+        self.batch_idx = batch_idx
+        quant_model_calib_timm(self.model, data_loader, self.quant_config, batch_size, self._calib_predict)
+        if save_calib_model:
+            self._save_calib_weights()
+
+    def load_calib_weights(self):
+        assert os.path.exists(self.calib_weights), "Calibrated weights {} does not exist, please provide correct file".format(self.calib_weights)
+        state_dict = torch.load(self.calib_weights, map_location='cpu')
+        if 'model' in state_dict.keys():
+            self.model.load_state_dict(state_dict['model'].state_dict())
+        else:
+            self.model.load_state_dict(state_dict)
+
+    def _save_calib_weights(self):
+        logger.info("Save calibrated models as: {}.".format(self.calib_weights))
+        torch.save(self.model.state_dict(), self.calib_weights)
+
+    def _calib_predict(self, model, calib_dataloader, num_batches):
+        total = num_batches if self.batch_idx is None else len(self.batch_idx)
+        with tqdm(total=total) as pbar:
+            for i, data in enumerate(calib_dataloader):
+                if self.batch_idx is None:
+                    data['img'] = data['img'].to('cuda:0')
+                    _ = model(return_loss=False, **data)
+                    pbar.update(1)
+                    if i >= num_batches:
+                        break
+                else:
+                    if i+1 in self.batch_idx:
+                        data['img'] = data['img'].to('cuda:0')
+                        _ = model(return_loss=False, **data)
+                        pbar.update(1)
+>>>>>>> add MMCls ModelQuantizer
 
 
 class BERTModelQuantizer(ModelQuantizer):

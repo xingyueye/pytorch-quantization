@@ -194,6 +194,18 @@ def quant_model_init(model, config, calib_weights='', type_str='CNN', do_trace=T
             model.load_state_dict(state_dict)
     return model
 
+def quant_model_init_mmlab(model, config, calib_weights='', type_str='CNN', do_trace=True):
+    # config = parse_config(config_file)
+    custom_module_map = get_custom_module_map(type_str)
+    quant_module_map = get_quant_module_map(config.quant_layers_type)
+    model = custom_ops_replace(model, config, custom_module_map)
+    model = quant_ops_replace(model, config, quant_module_map)
+    model_cp = model.module if hasattr(model, 'module') else model 
+    model_cp.backbone = quant_insert_qdq(model_cp.backbone, config, type_str, do_trace)
+    # model_cp.neck = quant_insert_qdq(model_cp.neck, config, type_str, do_trace)
+    return model
+
+
 # def bert_quant_insert_qdq(model, config):
 #     quant_desc = get_quant_desc(config)
 #     return bert_insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc)
