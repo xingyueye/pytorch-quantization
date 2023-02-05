@@ -307,15 +307,27 @@ parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
 
 # Quantization parameters
-parser.add_argument('--quantizer', type=str, default='Timm', help='ModelQuantizer', choices=['Timm', 'FTSWIN'])
-parser.add_argument('--quant', action='store_true', default=False, help='Enable quantization')
-parser.add_argument('--calib', action='store_true', default=False, help='Enable calibration')
-parser.add_argument('--partial', action='store_true', default=False, help='Enable partial quantization')
-parser.add_argument('--partial_dump', action='store_true', default=False, help='Dump results of partial quantization')
-parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml', help='Output directory to save calibrated model')
-parser.add_argument('--pretrained_calib', type=str, default='', help='Pretrained model')
-parser.add_argument('--export', action='store_true', default=False, help='Enable calibration')
-parser.add_argument('--export-batch-size', type=int, default=4, help='ONNX export batch size')
+parser.add_argument('--quantizer', type=str, default='Timm',choices=['Timm', 'FTSWIN'],
+                    help='ModelQuantizer, choices=[Timm, FTSWIN]')
+parser.add_argument('--quant', action='store_true', default=False,
+                    help='Enable quantization')
+parser.add_argument('--calib', action='store_true', default=False,
+                    help='Enable calibration')
+parser.add_argument('--partial', action='store_true', default=False,
+                    help='Enable partial quantization')
+parser.add_argument('--partial_dump', action='store_true', default=False,
+                    help='Dump results of partial quantization')
+parser.add_argument('--quant_config', type=str, default='./mpq_config.yaml',
+                    help='Output directory to save calibrated model')
+parser.add_argument('--pretrained_calib', type=str, default='',
+                    help='Pretrained model')
+parser.add_argument('--export', action='store_true', default=False,
+                    help='ONNX export')
+parser.add_argument('--export-batch-size', type=int, default=4,
+                    help='ONNX export batch size')
+# for dynamic batch size export, you can use --export-dynamic-axes="{'input': {0: 'batch'}, 'output': {0: 'batch'}}"
+parser.add_argument('--export-dynamic-axes', type=str, default=None,
+                    help='ONNX export dynamic axes')
 
 # Distillation parameters
 parser.add_argument('--teacher-model', default='tf_efficientnet_b0', type=str, metavar='MODEL',
@@ -709,8 +721,10 @@ def main():
             return
 
     if args.export:
+        from ast import literal_eval
+        dynamic_axes = literal_eval(args.dynamic_axes)
         data_shape = (args.export_batch_size,) + data_config['input_size']
-        quantizer.export_onnx(data_shape)
+        quantizer.export_onnx(data_shape, dynamic_axes)
         return
 
     # setup checkpoint saver and eval metric tracking

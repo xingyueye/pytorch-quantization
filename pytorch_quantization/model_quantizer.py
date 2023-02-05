@@ -97,9 +97,9 @@ class TimmModelQuantizer(ModelQuantizer):
         else:
             return [], ori_acc, ptq_acc, 'None', 'None'
 
-    def export_onnx(self, data_shape):
-        onnx_path = self.calib_weights.replace(".pt", "_qat.onnx")
-        quant_model_export(self.model, onnx_path, data_shape)
+    def export_onnx(self, data_shape, dynamic_axes=None):
+        onnx_path = self.calib_weights.replace(".pt", ".onnx") if dynamic_axes is None else self.calib_weights.replace(".pt", "_dynamic.onnx")
+        quant_model_export(self.model, onnx_path, data_shape, dynamic_axes=dynamic_axes)
         logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 
