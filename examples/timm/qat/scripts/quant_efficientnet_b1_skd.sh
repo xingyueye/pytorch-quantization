@@ -1,8 +1,9 @@
+IMAGENET='/mnt/beegfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012/'
 # efficientnet_b1
 # calib
 CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                     --master_port 12376 train.py  \
-                                    /mnt/beegfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012/ \
+                                    ${IMAGENET} \
                                     -b 32 \
                                     --model efficientnet_b1 \
                                     --quant \
@@ -14,7 +15,7 @@ CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
 # qat
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc_per_node 8 \
                                     --master_port 12346 train.py  \
-                                    /mnt/beegfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012/ \
+                                    ${IMAGENET} \
                                     --model efficientnet_b1 \
                                     --quant \
                                     --quant_config qat/configs/mpq_config_efficientnet.yaml \

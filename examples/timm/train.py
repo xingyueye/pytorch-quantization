@@ -724,7 +724,7 @@ def main():
         from ast import literal_eval
         data_shape = (args.export_batch_size,) + data_config['input_size']
         onnx_path = get_outdir(args.output if args.output else './output/onnx', '')
-        dynamic_axes = literal_eval(args.dynamic_axes)
+        dynamic_axes = literal_eval(args.export_dynamic_axes)
         quantizer.export_onnx(data_shape, onnx_path, dynamic_axes)
         return
 

@@ -63,7 +63,8 @@ do
                                       --val-split val \
                                       --validation-batch-size 50 \
                                       --export \
-                                      --export-batch-size 1
+                                      --export-batch-size 1 \
+                                      --export-dynamic-axes "{'input': {0: 'batch'}, 'output': {0: 'batch'}}"
 
 done
 
@@ -97,7 +98,8 @@ do
                                       --val-split val \
                                       --validation-batch-size 25 \
                                       --export \
-                                      --export-batch-size 1
+                                      --export-batch-size 1 \
+                                      --export-dynamic-axes "{'input': {0: 'batch'}, 'output': {0: 'batch'}}"
 
 done
 
@@ -131,6 +133,7 @@ do
                                       --val-split val \
                                       --validation-batch-size 10 \
                                       --export \
-                                      --export-batch-size 1
+                                      --export-batch-size 1 \
+                                      --export-dynamic-axes "{'input': {0: 'batch'}, 'output': {0: 'batch'}}"
 
 done

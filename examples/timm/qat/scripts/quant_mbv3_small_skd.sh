@@ -1,23 +1,24 @@
-# efficientnet_b0
+IMAGENET='/mnt/beegfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012/'
+# mobilenetv3_small_075
 # calib
 CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                     --master_port 12346 train.py  \
-                                    /mnt/beegfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012/ \
+                                    ${IMAGENET} \
                                     -b 32 \
                                     --model mobilenetv3_small_075 \
                                     --quant \
                                     --calib \
-                                    --quant_config configs/mpq_config_mobilenet.yaml \
+                                    --quant_config qat/configs/mpq_config_mobilenet.yaml \
                                     --pretrained \
                                     --val-split val \
 
 # qat
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc_per_node 8 \
                                     --master_port 12346 train.py  \
-                                    /mnt/beegfs/ssd_pool/docker/user/hadoop-automl/common/ILSVRC2012/ \
+                                    ${IMAGENET} \
                                     --model mobilenetv3_small_075 \
                                     --quant \
-                                    --quant_config configs/mpq_config_mobilenet.yaml \
+                                    --quant_config qat/configs/mpq_config_mobilenet.yaml \
                                     --pretrained_calib mobilenetv3_small_075_calib_128_w8a8_naive.pt \
                                     -b 512 \
                                     --sched step \
