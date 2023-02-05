@@ -7,16 +7,9 @@ from timm.data import resolve_data_config
 from TensorRT.eval import Evaluator
 from TensorRT.data import get_val_loader
 
-import sys
-
-sys.path.append("../../")
-
-
 parser = argparse.ArgumentParser(description='PyTorch Partial Quantiztion Demo')
 parser.add_argument('--engine_path', metavar='DIR',
                     help='path to engines')
-parser.add_argument('--model', '-m', metavar='NAME', default='tv_resnet50',
-                    help='model architecture (default: tv_resnet50)')
 parser.add_argument('--eval-dir', default='None', type=str,
                     help='model architecture (default: tv_resnet50)')
 parser.add_argument('--workers', default=6, type=int, metavar='N',
@@ -27,48 +20,42 @@ parser.add_argument('--num-classes', type=int, default=1000,
                     help='Number classes in dataset (default: 1000)')
 parser.add_argument("--io-type", type=str, default='fp16',
                     help="input/output data precision")
-parser.add_argument('--output', type=str, default='./timm_trt_eval_results.txt',
+parser.add_argument('--output', type=str, default='timm_trt_eval_result.txt',
                     help='output directory of results')
 
 
-timm_model_list = [
-    'resnet18d',
-    'resnet26',
-    'resnet26d',
-    'resnet26t',
-    'resnet34',
-    'resnet34d',
-    'resnet50',
-    'resnet50d',
-    'resnet101',
-    'resnet101d',
-    'resnetrs50',
-    'resnetrs101',
-    'resnetrs152',
-    'resnetrs270',
-    'resnext50_32x4d',
-    'resnext50d_32x4d',
-    'tv_resnet50',
-    'efficientnet_b0',
-    'efficientnet_b1',
-    'efficientnet_b2',
-    'efficientnet_b3',
-    'mobilenetv3_large_100',
-    'mobilenetv3_small_075'
-]
+# timm_model_list = [
+#     'resnet18d',
+#     'resnet26',
+#     'resnet26d',
+#     'resnet26t',
+#     'resnet34',
+#     'resnet34d',
+#     'resnet50',
+#     'resnet50d',
+#     'resnet101',
+#     'resnet101d',
+#     'resnetrs50',
+#     'resnetrs101',
+#     'resnetrs152',
+#     'resnetrs270',
+#     'resnext50_32x4d',
+#     'resnext50d_32x4d',
+#     'tv_resnet50',
+#     'efficientnet_b0',
+#     'efficientnet_b1',
+#     'efficientnet_b2',
+#     'efficientnet_b3',
+#     'mobilenetv3_large_100',
+#     'mobilenetv3_small_075'
+# ]
 
 def main(args):
     results_txt = ''
     trt_engines = glob.glob(os.path.join(args.engine_path, "*.trt"))
-    for timm_model in timm_model_list:
-        engine_path = None
-        for engine in trt_engines:
-            if os.path.basename(engine).startswith(timm_model + '_'):
-                engine_path = engine
-                break
-        if engine_path is None:
-            print("Model {} TensorRT build is not found".format(timm_model))
-            continue
+    for engine in trt_engines:
+        timm_model = os.path.basename(engine).split('_calib')[0]
+        print("Eval Model {}...".format(timm_model))
         model = create_model(
             timm_model,
             num_classes=args.num_classes,
@@ -87,7 +74,7 @@ def main(args):
                                     std=data_config['std'],
                                     cropt_pct=data_config['crop_pct'])
 
-        evaluator = Evaluator(engine_path, val_loader, dtype=args.io_type)
+        evaluator = Evaluator(engine, val_loader, dtype=args.io_type)
         top1, top5, latency, qps = evaluator.evaluate()
         results_txt += "{}:TOP1={:.2f},TOP5={:.2f},LAT={:.2f},QPS={:.2f}\n".format(timm_model, top1, top5, latency, qps)
 
