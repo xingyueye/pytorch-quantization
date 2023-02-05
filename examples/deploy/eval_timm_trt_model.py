@@ -24,32 +24,6 @@ parser.add_argument('--output', type=str, default='timm_trt_eval_result.txt',
                     help='output directory of results')
 
 
-# timm_model_list = [
-#     'resnet18d',
-#     'resnet26',
-#     'resnet26d',
-#     'resnet26t',
-#     'resnet34',
-#     'resnet34d',
-#     'resnet50',
-#     'resnet50d',
-#     'resnet101',
-#     'resnet101d',
-#     'resnetrs50',
-#     'resnetrs101',
-#     'resnetrs152',
-#     'resnetrs270',
-#     'resnext50_32x4d',
-#     'resnext50d_32x4d',
-#     'tv_resnet50',
-#     'efficientnet_b0',
-#     'efficientnet_b1',
-#     'efficientnet_b2',
-#     'efficientnet_b3',
-#     'mobilenetv3_large_100',
-#     'mobilenetv3_small_075'
-# ]
-
 def main(args):
     results_txt = ''
     trt_engines = glob.glob(os.path.join(args.engine_path, "*.trt"))
