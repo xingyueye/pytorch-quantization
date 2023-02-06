@@ -18,7 +18,8 @@ class ModelQuantizer:
             self.ori_model = copy.deepcopy(model)
         self.calib_weights = calib_weights
         self.model_name = model_name
-        self.model = self._quant_model_init(model, self.quant_config, self.calib_weights)
+        self.device = next(model.parameters()).device
+        self.model = self._quant_model_init(model, self.quant_config, self.calib_weights).to(self.device)
 
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init(model, config, calib_weights, type_str='CNN', do_trace=True)
