@@ -120,9 +120,9 @@ def do_partial_quant(sensitivity_list, model, loader, eval_func, org_acc1, ptq_a
     total_layers = len(sensitivity_list)
     count = 0
     for layer_name, sensitivity in sensitivity_list:
-        print("Disable quantization of layer {}".format(layer_name))
         if org_acc1 - partial_acc1 < drop or count >= int(0.1 * total_layers):
             break
+        print("Disable quantization of layer {}".format(layer_name))
         module_quant_disable(model, layer_name)
         partial = eval_func(loader, model)
         if partial < partial_acc1:
