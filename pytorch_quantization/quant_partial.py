@@ -35,15 +35,11 @@ class GetLayerSensitivity:
         model_quant_disable(self.model)
 
         handle = self.layer.register_forward_hook(self.data_saver)
-        forward_func(self.model)
-        # with torch.no_grad():
-        #     _ = self.model(model_input.to(self.device))
+        forward_func()
         module_ori_output = self.data_saver.output_store.detach()
 
         module_quant_enable(self.model, k)
-        forward_func(self.model)
-        # with torch.no_grad():
-        #     _ = self.model(model_input.to(self.device))
+        forward_func()
         module_quant_output = self.data_saver.output_store.detach()
 
         handle.remove()

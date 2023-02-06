@@ -71,6 +71,10 @@ class TimmModelQuantizer(ModelQuantizer):
         if save_calib_model:
             self._save_calib_weights()
 
+    def _forward_step(self, images):
+        with torch.no_grad():
+            _ = self.model(images.to(next(self.model.parameters()).device))
+
     def partial_quant(self, eval_loader, eval_func, mini_eval_loader=None):
         self.quant_disable()
         ori_acc = self.eval(eval_loader, eval_func)
@@ -86,14 +90,9 @@ class TimmModelQuantizer(ModelQuantizer):
             else:
                 import functools
                 # only use one batch
-                for i, (images, target) in enumerate(eval_loader):
-                    images = images.to(eval_loader)
-                    break
-                def forward_sample_image(model, images):
-                    with torch.no_grad():
-                        _ = self.model(images.to(next(model.parameters()).device))
-                sample_func = functools.partial(forward_sample_image, images=images)
-                sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method)
+                sample_image = next(iter(eval_loader))
+                sample_func = functools.partial(self._forward_step, images=sample_image)
+                sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method, forward_func=sample_func)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
 
             print(sensitivity_list)
@@ -135,6 +134,10 @@ class MMClsModelQuantizer(ModelQuantizer):
         if save_calib_model:
             self._save_calib_weights()
 
+    def _forward_step(self, images):
+        with torch.no_grad():
+            _ = self.model(return_loss=False, **images)
+
     def load_calib_weights(self):
         assert os.path.exists(self.calib_weights), "Calibrated weights {} does not exist, please provide correct file".format(self.calib_weights)
         state_dict = torch.load(self.calib_weights, map_location='cpu')
@@ -157,11 +160,8 @@ class MMClsModelQuantizer(ModelQuantizer):
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
             else:
                 import functools
-                sample_image = next(iter(eval_loader))
-                def forward_sample_image(model, images):
-                    with torch.no_grad():
-                        _ = self.model(return_loss=False, **images)
-                sample_func = functools.partial(forward_sample_image, images=sample_image)
+                sample_image = next(iter(eval_loader))                    
+                sample_func = functools.partial(self._forward_step, images=sample_image)
                 sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method, forward_func=sample_func)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
 
