@@ -84,6 +84,15 @@ class TimmModelQuantizer(ModelQuantizer):
                 sensitivity_list = top1_sensitivity(self.model, _loader, eval_func)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
             else:
+                import functools
+                # only use one batch
+                for i, (images, target) in enumerate(eval_loader):
+                    images = images.to(eval_loader)
+                    break
+                def forward_sample_image(model, images):
+                    with torch.no_grad():
+                        _ = self.model(images.to(next(model.parameters()).device))
+                sample_func = functools.partial(forward_sample_image, images=images)
                 sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
 
