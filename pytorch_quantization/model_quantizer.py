@@ -117,14 +117,6 @@ class TimmModelQuantizer(ModelQuantizer):
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 
 
-<<<<<<< HEAD
-class MMLabModelQuantizer(ModelQuantizer):
-    NotImplementedError
-    # def calibration(self, data_loader, batch_size, save_calib_model=False):
-    #     quant_model_calib_mmlab(self.model, data_loader, self.quant_config, batch_size)
-    #     if save_calib_model:
-    #         self._save_calib_weights()
-=======
 class MMlabModelQuantizer(ModelQuantizer):
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
         super(MMlabModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
@@ -205,7 +197,6 @@ class MMlabModelQuantizer(ModelQuantizer):
                         data['img'] = data['img'].to('cuda:0')
                         _ = model(return_loss=False, **data)
                         pbar.update(1)
->>>>>>> add MMCls ModelQuantizer
 
 
 class BERTModelQuantizer(ModelQuantizer):
