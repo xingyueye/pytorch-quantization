@@ -155,7 +155,13 @@ class MMlabModelQuantizer(ModelQuantizer):
                 sensitivity_list = top1_sensitivity(self.model, _loader, eval_func)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
             else:
-                sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method)
+                import functools
+                sample_image = next(iter(eval_loader))
+                def forward_sample_image(model, images):
+                    with torch.no_grad():
+                        _ = self.model(return_loss=False, **images)
+                sample_func = functools.partial(forward_sample_image, images=sample_image)
+                sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method, forward_func=sample_func)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
 
             print(sensitivity_list)

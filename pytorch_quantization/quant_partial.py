@@ -30,18 +30,20 @@ class GetLayerSensitivity:
         self.device = device
         self.data_saver = DataSaverHook(store_input=True, store_output=True)
 
-    def __call__(self, model_input, k):
+    def __call__(self, forward_func, k):
         self.model.eval()
         model_quant_disable(self.model)
 
         handle = self.layer.register_forward_hook(self.data_saver)
-        with torch.no_grad():
-            _ = self.model(model_input.to(self.device))
+        forward_func(self.model)
+        # with torch.no_grad():
+        #     _ = self.model(model_input.to(self.device))
         module_ori_output = self.data_saver.output_store.detach()
 
         module_quant_enable(self.model, k)
-        with torch.no_grad():
-            _ = self.model(model_input.to(self.device))
+        forward_func(self.model)
+        # with torch.no_grad():
+        #     _ = self.model(model_input.to(self.device))
         module_quant_output = self.data_saver.output_store.detach()
 
         handle.remove()
@@ -60,14 +62,9 @@ def quantable_layers_gather(model):
     return quantable_layers
 
 
-def fast_sensitivity(model, loader, method, device=None):
+def fast_sensitivity(model, loader, method, device=None, forward_func=None):
     if device is None:
         device = next(model.parameters()).device
-
-    # only use one batch
-    for i, (images, target) in enumerate(loader):
-        images = images.to(device)
-        break
 
     sensitivity_list = list()
     model_quant_disable(model)
@@ -81,7 +78,7 @@ def fast_sensitivity(model, loader, method, device=None):
         if len(children_modules) == 1 and isinstance(children_modules[0], quant_nn.TensorQuantizer):
             m = get_module(model, k + '._input_quantizer')
         sensitivity = GetLayerSensitivity(model, m, device)
-        module_ori_output, module_quant_output = sensitivity(images, k)
+        module_ori_output, module_quant_output = sensitivity(forward_func, k)
 
         if method == 'mse':
             mse = torch_mse_error(module_ori_output, module_quant_output)
