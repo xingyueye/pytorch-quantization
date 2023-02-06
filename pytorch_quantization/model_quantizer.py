@@ -144,10 +144,10 @@ class MMlabModelQuantizer(ModelQuantizer):
 
     def partial_quant(self, eval_loader, eval_func, mini_eval_loader=None):
         self.quant_disable()
-        ori_acc = eval_func(self.model)
+        ori_acc = eval_func(eval_loader, self.model)
 
         self.quant_enable()
-        ptq_acc = eval_func(self.model)
+        ptq_acc = eval_func(eval_loader, self.model)
         
         if ori_acc - ptq_acc > self.quant_config.partial_ptq.drop:
             if self.quant_config.partial_ptq.sensitivity_method == 'top1':
