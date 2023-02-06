@@ -184,18 +184,19 @@ class MMClsModelQuantizer(ModelQuantizer):
 
     def _calib_predict(self, model, calib_dataloader, num_batches):
         total = num_batches if self.batch_idx is None else len(self.batch_idx)
+        
         with tqdm(total=total) as pbar:
             for i, data in enumerate(calib_dataloader):
                 if self.batch_idx is None:
                     data['img'] = data['img'].to('cuda:0')
-                    _ = model(return_loss=False, **data)
+                    self._forward_step(data)
                     pbar.update(1)
                     if i >= num_batches:
                         break
                 else:
                     if i+1 in self.batch_idx:
                         data['img'] = data['img'].to('cuda:0')
-                        _ = model(return_loss=False, **data)
+                        self._forward_step(data)
                         pbar.update(1)
 
 
