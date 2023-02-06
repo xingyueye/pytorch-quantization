@@ -293,8 +293,6 @@ def main():
     
     _test = functools.partial(test, args=args, dataset=test_dataset, distributed=distributed, logger=logger)
     if args.ptq:
-        # _test(model)
-        # model = get_ptq_model(model, test_loader, _test, pretrained_calib=args.pretrained_calib)
         quantizer.calibration(test_loader, test_loader.batch_size, save_calib_model=True)
         if args.partial:
             quantizer.load_calib_weights()
@@ -312,6 +310,9 @@ def main():
             timestamp=timestamp,
             device='cpu' if args.device == 'cpu' else 'cuda',
             meta=meta)
+    
+    if args.save_quant_model:
+        quantizer.export_onnx(data_shape=(1, 3, 224, 224))
 
 if __name__ == '__main__':
     main()

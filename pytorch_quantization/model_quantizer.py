@@ -1,5 +1,6 @@
 import os
 import copy
+import functools
 
 import logging
 import os.path
@@ -88,7 +89,6 @@ class TimmModelQuantizer(ModelQuantizer):
                 sensitivity_list = top1_sensitivity(self.model, _loader, eval_func)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
             else:
-                import functools
                 # only use one batch
                 sample_image = next(iter(eval_loader))
                 sample_func = functools.partial(self._forward_step, images=sample_image)
@@ -159,7 +159,6 @@ class MMClsModelQuantizer(ModelQuantizer):
                 sensitivity_list = top1_sensitivity(self.model, _loader, eval_func)
                 sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
             else:
-                import functools
                 sample_image = next(iter(eval_loader))                    
                 sample_func = functools.partial(self._forward_step, images=sample_image)
                 sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method, forward_func=sample_func)
@@ -178,13 +177,27 @@ class MMClsModelQuantizer(ModelQuantizer):
         else:
             return [], ori_acc, ptq_acc, 'None'
 
+    def export_onnx(self, data_shape, dynamic_axes=None):
+        onnx_path = self.calib_weights.replace(".pth", ".onnx") if dynamic_axes is None else self.calib_weights.replace(".pth", "_dynamic.onnx")
+        model = self.model.module if hasattr(self.model, 'module') else self.model
+
+        # replace original forward function
+        origin_forward = model.forward
+        model.forward = functools.partial(model.forward, img_metas={}, return_loss=False)
+        
+        quant_model_export(model, onnx_path, data_shape, dynamic_axes=dynamic_axes)
+        logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
+        remove_qdq_nodes_from_qat_onnx(onnx_path)
+        
+        model.forward = origin_forward
+
     def _save_calib_weights(self):
         logger.info("Save calibrated models as: {}.".format(self.calib_weights))
         torch.save(self.model.state_dict(), self.calib_weights)
 
     def _calib_predict(self, model, calib_dataloader, num_batches):
         total = num_batches if self.batch_idx is None else len(self.batch_idx)
-        
+
         with tqdm(total=total) as pbar:
             for i, data in enumerate(calib_dataloader):
                 if self.batch_idx is None:
