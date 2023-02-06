@@ -117,9 +117,9 @@ class TimmModelQuantizer(ModelQuantizer):
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 
 
-class MMlabModelQuantizer(ModelQuantizer):
+class MMClsModelQuantizer(ModelQuantizer):
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(MMlabModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+        super(MMClsModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
 
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init_mmlab(model, config, calib_weights)
@@ -248,6 +248,6 @@ class FTSWINModelQuantizer(ModelQuantizer):
 class ModelQuantizerFactory(object):
     @classmethod
     def get_model_quantizer(cls, type_str, *args, **kwargs):
-        valid_str_list = ['', 'Timm', 'MMLab', 'BERT', 'FTSWIN']
+        valid_str_list = ['', 'Timm', 'MMLab', 'BERT', 'FTSWIN', 'MMCls']
         assert type_str in valid_str_list, 'Unsupported {}ModelQuantizer'.format(type_str)
         return eval("{}ModelQuantizer".format(type_str))(*args, **kwargs)
