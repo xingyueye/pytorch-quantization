@@ -141,6 +141,35 @@ class MMlabModelQuantizer(ModelQuantizer):
         else:
             self.model.load_state_dict(state_dict)
 
+    def partial_quant(self, eval_loader, eval_func, mini_eval_loader=None):
+        self.quant_disable()
+        ori_acc = eval_func(self.model)
+
+        self.quant_enable()
+        ptq_acc = eval_func(self.model)
+        
+        if ori_acc - ptq_acc > self.quant_config.partial_ptq.drop:
+            if self.quant_config.partial_ptq.sensitivity_method == 'top1':
+                _loader = mini_eval_loader if mini_eval_loader is not None else eval_loader
+                sensitivity_list = top1_sensitivity(self.model, _loader, eval_func)
+                sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
+            else:
+                sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method)
+                sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
+
+            print(sensitivity_list)
+            skip_layers, partial_acc = do_partial_quant(sensitivity_list,
+                                                         self.model,
+                                                         eval_loader,
+                                                         eval_func,
+                                                         ori_acc,
+                                                         ptq_acc,
+                                                         self.quant_config.partial_ptq.drop)
+
+            return skip_layers, ori_acc, partial_acc, self.quant_config.partial_ptq.sensitivity_method
+        else:
+            return [], ori_acc, ptq_acc, 'None'
+
     def _save_calib_weights(self):
         logger.info("Save calibrated models as: {}.".format(self.calib_weights))
         torch.save(self.model.state_dict(), self.calib_weights)
