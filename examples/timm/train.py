@@ -328,7 +328,9 @@ parser.add_argument('--export-batch-size', type=int, default=4,
 # for dynamic batch size export, you can use --export-dynamic-axes="{'input': {0: 'batch'}, 'output': {0: 'batch'}}"
 parser.add_argument('--export-dynamic-axes', type=str, default='None',
                     help='ONNX export dynamic axes')
-
+# Eval parameters
+parser.add_argument('--eval', action='store_true', default=False,
+                    help='Enable evaluation')
 # Distillation parameters
 parser.add_argument('--teacher-model', default='tf_efficientnet_b0', type=str, metavar='MODEL',
                     help='Name of teacher model to train (default: "tf_efficientnet_b0"')
@@ -719,6 +721,10 @@ def main():
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
         if not args.export:
             return
+
+    if args.eval:
+        validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
+        return
 
     if args.export:
         from ast import literal_eval

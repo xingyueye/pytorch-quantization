@@ -17,7 +17,7 @@ a_qscheme:
     percentile: 99.99            # used for histogram calibration
     hist_method: 'percentile'      # 'entropy', 'percentile', 'mse'
 
-calib_data_nums: 128            # total number of data used to calibrate the model
+calib_data_nums: 80            # total number of data used to calibrate the model
 
 partial_ptq:
     sensitivity_method: "mse"   #'mse', 'cosine', 'top1', 'snr'
