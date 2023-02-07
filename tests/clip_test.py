@@ -23,7 +23,7 @@ import numpy as np
 
 import torch
 
-from pytorch_quantization.nn.modules import clip
+from mtpq.nn.modules import clip
 
 # make everything run on the GPU
 torch.set_default_tensor_type('torch.cuda.FloatTensor')

@@ -23,10 +23,10 @@ import numpy as np
 
 import torch
 
-from pytorch_quantization import tensor_quant
-from pytorch_quantization import calib
-from pytorch_quantization.nn.modules import tensor_quantizer
-from pytorch_quantization import utils as quant_utils
+from mtpq import tensor_quant
+from mtpq import calib
+from mtpq.nn.modules import tensor_quantizer
+from mtpq import utils as quant_utils
 import tests.utils as test_utils
 from tests.fixtures import verbose
 

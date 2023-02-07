@@ -27,7 +27,7 @@ from torch.nn import CrossEntropyLoss
 from transformers import Trainer, is_torch_tpu_available
 from transformers.trainer_utils import PredictionOutput
 
-from pytorch_quantization.model_quantizer import BERTModelQuantizer
+from mtpq.model_quantizer import BERTModelQuantizer
 
 
 logger = logging.getLogger(__name__)
@@ -205,7 +205,7 @@ class QuestionAnsweringTrainer(Trainer):
         input_tuple = tuple(v.to(device) for k, v in batch.items())
 
         logger.info("Converting model to be onnx compatible")
-        from pytorch_quantization.nn import TensorQuantizer
+        from mtpq.nn import TensorQuantizer
 
         TensorQuantizer.use_fb_fake_quant = True
 

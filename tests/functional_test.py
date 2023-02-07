@@ -23,7 +23,7 @@ import numpy as np
 
 import torch
 
-import pytorch_quantization.nn.functional as QF
+import mtpq.nn.functional as QF
 
 np.random.seed(1234)
 torch.manual_seed(1234)

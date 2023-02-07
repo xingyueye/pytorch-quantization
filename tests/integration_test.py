@@ -27,10 +27,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from apex.amp import _amp_state
 
-from pytorch_quantization import tensor_quant
-from pytorch_quantization import quant_modules
-from pytorch_quantization import nn as quant_nn
-from pytorch_quantization.tensor_quant import QuantDescriptor
+from mtpq import tensor_quant
+from mtpq import quant_modules
+from mtpq import nn as quant_nn
+from mtpq.tensor_quant import QuantDescriptor
 from tests.fixtures.models import LeNet, QuantLeNet
 from tests.fixtures import verbose
 

@@ -98,7 +98,7 @@ class QuantArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
 
-    quant_config: Optional[str] = field(default='./configs/mpq_config.yaml', metadata={"help": "config of quantization."})
+    quant_config: Optional[str] = field(default='./configs/mtpq_config.yaml', metadata={"help": "config of quantization."})
     pretrained_calib: Optional[str] = field(default='', metadata={"help": "Calibrated pretrained model."})
     do_calib: bool = field(default=False, metadata={"help": "Whether to run calibration of quantization ranges."})
     do_qat: bool = field(default=False, metadata={"help": "Whether to run Quantization Aware Training."})

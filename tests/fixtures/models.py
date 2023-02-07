@@ -21,8 +21,8 @@
 import pytest
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_quantization.nn import QuantConv2d, QuantLinear
-from pytorch_quantization.tensor_quant import QuantDescriptor
+from mtpq.nn import QuantConv2d, QuantLinear
+from mtpq.tensor_quant import QuantDescriptor
 
 class LeNet(nn.Module):
     def __init__(self, **kwargs):

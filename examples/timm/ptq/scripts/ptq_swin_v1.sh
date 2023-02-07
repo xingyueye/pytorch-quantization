@@ -12,7 +12,7 @@ do
                                       --quantizer FTSWIN \
                                       --quant \
                                       --calib \
-                                      --quant_config ptq/configs/mpq_config_swin_v1.yaml \
+                                      --quant_config ptq/configs/mtpq_config_swin_v1.yaml \
                                       --pretrained \
                                       --val-split val
 done

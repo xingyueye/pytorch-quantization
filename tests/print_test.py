@@ -24,10 +24,10 @@ can inspect all the print messages in the project
 import torch
 from torch import nn
 
-from pytorch_quantization import calib
-from pytorch_quantization import tensor_quant
-from pytorch_quantization import nn as quant_nn
-from pytorch_quantization.nn.quantizer.tensor_quantizer import TensorQuantizer
+from mtpq import calib
+from mtpq import tensor_quant
+from mtpq import nn as quant_nn
+from mtpq.nn.quantizer.tensor_quantizer import TensorQuantizer
 
 # pylint:disable=missing-docstring, no-self-use
 

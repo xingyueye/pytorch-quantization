@@ -16,12 +16,12 @@
 #
 
 
-"""Test pytorch_quantization.utils"""
+"""Test mtpq.utils"""
 import pytest
 import numpy as np
 
 import torch
-from pytorch_quantization import utils as quant_utils
+from mtpq import utils as quant_utils
 from tests.fixtures import verbose
 
 np.random.seed(12345)

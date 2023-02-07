@@ -8,7 +8,7 @@ CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                     --model mobilenetv2_100 \
                                     --quant \
                                     --calib \
-                                    --quant_config qat/configs/mpq_config_mobilenet.yaml \
+                                    --quant_config qat/configs/mtpq_config_mobilenet.yaml \
                                     --pretrained \
                                     --val-split val \
 # qat
@@ -17,7 +17,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc
                                     ${IMAGENET} \
                                     --model mobilenetv2_100 \
                                     --quant \
-                                    --quant_config qat/configs/mpq_config_mobilenet.yaml \
+                                    --quant_config qat/configs/mtpq_config_mobilenet.yaml \
                                     --pretrained_calib mobilenetv2_100_calib_128_w8a8_naive.pt \
                                     -b 512 \
                                     --sched step \

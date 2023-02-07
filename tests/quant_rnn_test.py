@@ -25,8 +25,8 @@ from torch import nn
 
 import numpy as np
 
-from pytorch_quantization.nn.modules import quant_rnn
-from pytorch_quantization import tensor_quant
+from mtpq.nn.modules import quant_rnn
+from mtpq import tensor_quant
 
 from tests.fixtures import verbose
 

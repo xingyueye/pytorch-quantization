@@ -39,29 +39,29 @@ MPQ well supports timm models where the majority of them has a tolerable accurac
 #### From Binaries (Recommended)
 
 ```bash
-pip install mpq
+pip3 install meituan-pytorch-quantization
 ```
 
 #### From Source (For Develeopment)
 
 ```bash
-git clone ssh://git@git.sankuai.com/mtmlp/pytorch_quantization.git
-cd pytorch-quantization
+git clone ssh://git@git.sankuai.com/mtmlp/meituan-pytorch-quantization.git
+cd meituan-pytorch-quantization
 ```
 
 Install PyTorch and prerequisites
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 # for CUDA 10.2 users
-pip install torch>=1.9.1
+pip3 install torch>=1.9.1
 # for CUDA 11.1 users
-pip install torch>=1.9.1+cu111
+pip3 install torch>=1.9.1+cu111
 ```
 
 Build and install pytorch-quantization
 ```bash
-# Python version >= 3.7, GCC version >= 5.4 required
-python setup.py install
+# Python version >= 3.6, GCC version >= 5.4 required
+python3 setup.py install
 ```
 
 ## Quickstart

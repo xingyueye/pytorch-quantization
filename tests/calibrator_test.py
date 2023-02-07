@@ -22,9 +22,9 @@ import numpy as np
 
 import torch
 
-from pytorch_quantization import utils as quant_utils
-from pytorch_quantization import calib
-from pytorch_quantization import nn as quant_nn
+from mtpq import utils as quant_utils
+from mtpq import calib
+from mtpq import nn as quant_nn
 import tests.utils as test_utils
 from tests.fixtures import verbose
 from tests.fixtures.models import QuantLeNet

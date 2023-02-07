@@ -23,10 +23,10 @@ import numpy as np
 import torch
 from torch.nn.parameter import Parameter
 
-from pytorch_quantization import calib
-from pytorch_quantization import cuda_ext
-from pytorch_quantization import tensor_quant
-from pytorch_quantization.nn.quantizer.tensor_quantizer import TensorQuantizer
+from mtpq import calib
+from mtpq import cuda_ext
+from mtpq import tensor_quant
+from mtpq.nn.quantizer.tensor_quantizer import TensorQuantizer
 
 import tests.utils as test_utils
 from tests.fixtures import verbose

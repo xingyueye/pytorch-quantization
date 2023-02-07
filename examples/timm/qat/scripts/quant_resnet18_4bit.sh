@@ -8,7 +8,7 @@ CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                     --model resnet18 \
                                     --quant \
                                     --calib \
-                                    --quant_config qat/configs/mpq_config_r18_4bit_stable_lsq.yaml \
+                                    --quant_config qat/configs/mtpq_config_r18_4bit_stable_lsq.yaml \
                                     --pretrained \
                                     --val-split val
 # qat
@@ -17,7 +17,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc
                                     $IMAGENET \
                                     --model resnet18 \
                                     --quant \
-                                    --quant_config qat/configs/mpq_config_r18_4bit_stable_lsq.yaml \
+                                    --quant_config qat/configs/mtpq_config_r18_4bit_stable_lsq.yaml \
                                     --pretrained_calib resnet18_calib_128_w4a4_stable_lsq.pt \
                                     -b 64 \
                                     --sched cosine \

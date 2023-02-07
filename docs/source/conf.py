@@ -34,7 +34,7 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 import sphinx_glpi_theme
-from pytorch_quantization import __version__
+from mtpq import __version__
 
 # -- Project information -----------------------------------------------------
 

@@ -26,8 +26,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from pytorch_quantization import tensor_quant
-from pytorch_quantization.nn.modules import quant_pooling
+from mtpq import tensor_quant
+from mtpq.nn.modules import quant_pooling
 
 # make everything run on the GPU
 torch.set_default_tensor_type('torch.cuda.FloatTensor')

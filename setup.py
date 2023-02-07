@@ -48,12 +48,12 @@ license_header = """#
 # Generate version file
 with open(os.path.join(abspath, "VERSION")) as f:
     version = f.read().strip()
-with open(os.path.join(abspath, "pytorch_quantization/version.py"), "w") as f:
+with open(os.path.join(abspath, "mtpq/version.py"), "w") as f:
     f.write(license_header)
     f.write(F"__version__ = \"{version}\"")
 
 setup(
-    name="meituan-pytorch-quantization",
+    name="mtpq",
     version=version,
     description="Meituan Pytorch quantization toolkit",
     packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
@@ -63,7 +63,7 @@ setup(
     install_requires=requirements,
     ext_modules=[
         CUDAExtension(
-            name="pytorch_quantization.cuda_ext",
+            name="mtpq.cuda_ext",
             sources=[os.path.join(abspath, "src/tensor_quant.cpp"),
                      os.path.join(abspath, "src/tensor_quant_gpu.cu")])
     ],

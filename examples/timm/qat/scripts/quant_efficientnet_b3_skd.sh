@@ -8,7 +8,7 @@ CUDA_VISIBLE_DEVICES=0  python3 -m torch.distributed.launch --nproc_per_node 1 \
                                     --model efficientnet_b3 \
                                     --quant \
                                     --calib \
-                                    --quant_config qat/configs/mpq_config_efficientnet.yaml \
+                                    --quant_config qat/configs/mtpq_config_efficientnet.yaml \
                                     --pretrained \
                                     --val-split val \
                                     --input-size 3 300 300
@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc
                                     ${IMAGENET} \
                                     --model efficientnet_b3 \
                                     --quant \
-                                    --quant_config qat/configs/mpq_config_efficientnet.yaml \
+                                    --quant_config qat/configs/mtpq_config_efficientnet.yaml \
                                     --pretrained_calib efficientnet_b3_calib_128_w8a8_naive.pt \
                                     -b 128 \
                                     --sched step \

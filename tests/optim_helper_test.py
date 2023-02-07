@@ -24,8 +24,8 @@ import pytest
 
 import torch.optim as optim
 
-from pytorch_quantization.optim import helper
-from pytorch_quantization.tensor_quant import QuantDescriptor
+from mtpq.optim import helper
+from mtpq.tensor_quant import QuantDescriptor
 from .fixtures.models import QuantLeNet
 from .fixtures.models import resnet18
 

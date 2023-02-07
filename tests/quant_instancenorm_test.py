@@ -27,11 +27,11 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from pytorch_quantization import tensor_quant
-from pytorch_quantization.tensor_quant import QuantDescriptor
-from pytorch_quantization.nn.quantizer.tensor_quantizer import TensorQuantizer
-from pytorch_quantization import utils as quant_utils
-from pytorch_quantization.nn.modules import quant_instancenorm
+from mtpq import tensor_quant
+from mtpq.tensor_quant import QuantDescriptor
+from mtpq.nn.quantizer.tensor_quantizer import TensorQuantizer
+from mtpq import utils as quant_utils
+from mtpq.nn.modules import quant_instancenorm
 #import tests.utils as test_utils
 
 # make everything run on the GPU

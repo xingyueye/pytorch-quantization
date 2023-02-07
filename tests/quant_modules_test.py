@@ -22,9 +22,9 @@ import numpy as np
 
 import torch
 
-from pytorch_quantization import nn as quant_nn
-from pytorch_quantization import quant_modules
-from pytorch_quantization.quant_modules import QuantModuleReplacementHelper
+from mtpq import nn as quant_nn
+from mtpq import quant_modules
+from mtpq.quant_modules import QuantModuleReplacementHelper
 import tests.utils as test_utils
 from tests.fixtures import verbose
 

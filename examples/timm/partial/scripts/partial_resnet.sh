@@ -11,7 +11,7 @@ do
                                       --quantizer Timm \
                                       --quant \
                                       --calib \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained \
                                       --val-split val \
                                       --validation-batch-size 100
@@ -25,7 +25,7 @@ do
                                       --quant \
                                       --partial \
                                       --partial_dump \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained_calib ${MODEL}_calib_128_w8a8_naive.pt \
                                       --val-split val \
                                       --validation-batch-size 100 \
@@ -45,7 +45,7 @@ do
                                       --quantizer Timm \
                                       --quant \
                                       --calib \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained \
                                       --val-split val \
                                       --validation-batch-size 50
@@ -59,7 +59,7 @@ do
                                       --quant \
                                       --partial \
                                       --partial_dump \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained_calib ${MODEL}_calib_128_w8a8_naive.pt \
                                       --val-split val \
                                       --validation-batch-size 50 \
@@ -80,7 +80,7 @@ do
                                       --quantizer Timm \
                                       --quant \
                                       --calib \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained \
                                       --val-split val \
                                       --validation-batch-size 25
@@ -94,7 +94,7 @@ do
                                       --quant \
                                       --partial \
                                       --partial_dump \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained_calib ${MODEL}_calib_128_w8a8_naive.pt \
                                       --val-split val \
                                       --validation-batch-size 25 \
@@ -115,7 +115,7 @@ do
                                       --quantizer Timm \
                                       --quant \
                                       --calib \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained \
                                       --val-split val \
                                       --validation-batch-size 10
@@ -129,7 +129,7 @@ do
                                       --quant \
                                       --partial \
                                       --partial_dump \
-                                      --quant_config partial/configs/mpq_config.yaml \
+                                      --quant_config partial/configs/mtpq_config.yaml \
                                       --pretrained_calib ${MODEL}_calib_128_w8a8_naive.pt \
                                       --val-split val \
                                       --validation-batch-size 10 \

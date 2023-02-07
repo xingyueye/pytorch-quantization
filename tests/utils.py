@@ -22,7 +22,7 @@ from scipy.spatial import distance
 
 import torch
 
-from pytorch_quantization import tensor_quant
+from mtpq import tensor_quant
 
 def quantize_by_range(x, num_bits):
     """Quantize torch tensor by range to num_bits with symmetric zero-mean quantizer."""

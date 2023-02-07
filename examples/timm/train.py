@@ -39,9 +39,9 @@ from timm.scheduler import create_scheduler
 from timm.utils import ApexScaler, NativeScaler
 from torch.nn import functional as F
 
-# from pytorch_quantization.quant_intf import quant_model_init, quant_model_calib_timm, save_calib_model
-# from pytorch_quantization.model_quantizer import TimmModelQuantizer as ModelQuantizer
-from pytorch_quantization.model_quantizer import ModelQuantizerFactory
+# from mtpq.quant_intf import quant_model_init, quant_model_calib_timm, save_calib_model
+# from mtpq.model_quantizer import TimmModelQuantizer as ModelQuantizer
+from mtpq.model_quantizer import ModelQuantizerFactory
 
 try:
     from apex import amp
