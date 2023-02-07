@@ -1,6 +1,15 @@
 # Huggingface BERT Quantization Example
-
-
+Huggingface Transformers is the state-of-the-art NLP framework, and it provides thousands of pretrained models to perform tasks on different modalities such as text, vision, and audio. Here we show how to use meituan-pytorch-quantization tookit to quantize BERT without code invasion.
+## Install
+```shell
+pip3 install transformers==4.18.0
+```
+## Preparation
+Download bert-base-uncased and SQuAD1.1
+```shell
+cp scripts/download.sh ./
+/bin/bash download.sh
+```
 
 ## Quantization Aware Training (QAT)
 
