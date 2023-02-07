@@ -1,16 +1,16 @@
 # Meituan PyTorch Quantization
 
+![logo](assets/mtpq_small.png)
+
 ## Overview
 
-![logo](assets/mpq_logo.png)
-
-Meituan PyTorch Quantization (MPQ) is an Meituan initiative for accelerating industrial application for quantization in vision, NLP, and audio etc. MPQ significantly refactors the software architecture of `pytorch-quantization`, where it takes a top-down approach to automatically parse user-defined models and inserts quantization nodes. MPQ ships with PTQ, Partial PTQ, QAT and a myriad of up-to-date quantization algorithms. The final quantized model is made exportable to onnx in TensorRT's appetite to leverage NVIDIAs high performance GPUs.
+Meituan PyTorch Quantization (MTPQ) is an Meituan initiative for accelerating industrial application for quantization in vision, NLP, and audio etc. MTPQ significantly refactors the software architecture of `pytorch-quantization`, where it takes a top-down approach to automatically parse user-defined models and inserts quantization nodes. MTPQ ships with PTQ, Partial PTQ, QAT and a myriad of up-to-date quantization algorithms. The final quantized model is made exportable to onnx in TensorRT's appetite to leverage NVIDIAs high performance GPUs.
 
 ## Benchmark
 
 ### Quantization Performance on Classical Models 
 
-MPQ Quantization performance is tested with a list of classical models that are mostly used in practice, such as ResNet, MobileNet, EfficientNet, Swin, Bert and YOLOv6. The average accuracy loss is 0.41% compared to their FP16 counterparts.
+MTPQ Quantization performance is tested with a list of classical models that are mostly used in practice, such as ResNet, MobileNet, EfficientNet, Swin, Bert and YOLOv6. The average accuracy loss is 0.41% compared to their FP16 counterparts.
 
 ![Classical Models Accuracy](assets/sop_acc.png)
 
@@ -24,7 +24,7 @@ All models enjoy a substantial QPS boost (58% on average) after quantization.
 
 ### Quantization Performance on Timm Models
 
-MPQ well supports timm models where the majority of them has a tolerable accuracy loss if quantized only with PTQ or partial PTQ.
+MTPQ well supports timm models where the majority of them has a tolerable accuracy loss if quantized only with PTQ or partial PTQ.
 
 ![Timm Quantization Performance](assets/Timm_PTQ_perf.png)
 
@@ -39,7 +39,7 @@ MPQ well supports timm models where the majority of them has a tolerable accurac
 #### From Binaries (Recommended)
 
 ```bash
-pip3 install meituan-pytorch-quantization
+pip3 install mtpq
 ```
 
 #### From Source (For Develeopment)
@@ -58,7 +58,7 @@ pip3 install torch>=1.9.1
 pip3 install torch>=1.9.1+cu111
 ```
 
-Build and install pytorch-quantization
+Build and install
 ```bash
 # Python version >= 3.6, GCC version >= 5.4 required
 python3 setup.py install
@@ -86,11 +86,11 @@ sh qat/scripts/quant_efficientnet_b0_skd.sh
 
 More examples see [examples/timm/README.md](examples/timm/README.md) and [examples/huggingface/question_answering/README.md](examples/huggingface/question_answering/README.md).
 
-### MPQ Architecture
+### MTPQ Architecture
 
 For beginners, one needs to play with Model Quantizer only. For developers, it is made easy enough to inherit the base classes for new features, e.g., Module Converter to support more operations, Pattern Matcher to track new graph patterns, and Tensor Quantizer to adopt novel quantization algorithms etc.
 
-![MPQ Architecture](assets/architecture.png)
+![MTPQ Architecture](assets/architecture.png)
 
 ### Auto-Parsing and Q/DQ Node Insertion
 
