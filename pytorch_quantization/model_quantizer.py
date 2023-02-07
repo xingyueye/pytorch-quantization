@@ -25,6 +25,9 @@ class ModelQuantizer:
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init(model, config, calib_weights, type_str='CNN', do_trace=True)
 
+    def _forward_step(self, images):
+        NotImplementedError("_forward_step need to be implemented in subclass.")
+
     def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
         try:
             quant_model_calib(self.model, data_loader, self.quant_config, batch_size, custom_predict)
@@ -188,7 +191,7 @@ class MMClsModelQuantizer(ModelQuantizer):
         quant_model_export(model, onnx_path, data_shape, dynamic_axes=dynamic_axes)
         logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
         remove_qdq_nodes_from_qat_onnx(onnx_path)
-        
+
         model.forward = origin_forward
 
     def _save_calib_weights(self):
