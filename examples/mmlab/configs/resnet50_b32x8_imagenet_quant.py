@@ -106,3 +106,5 @@ checkpoint_config = dict(interval=1)
 log_config = dict(interval=100, hooks=[dict(type='TextLoggerHook')])
 workflow = [('train', 1)]
 gpu_ids = range(0, 1)
+log_level = 'INFO'
+
