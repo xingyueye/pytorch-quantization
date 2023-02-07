@@ -1,6 +1,6 @@
 # Meituan PyTorch Quantization
 
-![logo](assets/mtpq_small.png)
+<img src='assets/mtpq_small.png' width='350' height='75' />
 
 ## Overview
 
