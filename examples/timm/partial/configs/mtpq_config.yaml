@@ -27,6 +27,7 @@ partial_ptq:
 
 quant_layers: []              # manually specify quantized layers
 skip_layers: []               # manually specify skipped layers
+skip_modules: []              # manually specify skipped modules, all layers with this tag would be skipped
 special_layers:               # manually specify layers
     layers_list: [
                    {layer_name: "xxx",

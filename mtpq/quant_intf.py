@@ -133,6 +133,9 @@ def get_quant_desc(config):
     return EasyDict(quant_desc)
 
 def skip_layers_check(k, config):
+    for skip_module in config.skip_modules:
+        if skip_module in k:
+            return True
     return True if k in config.skip_layers else False
 
 def quant_ops_replace(model, config, quant_module_map=_DEFAULT_QUANT_MAP):
