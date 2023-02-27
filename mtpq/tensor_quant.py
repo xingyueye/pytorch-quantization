@@ -314,8 +314,8 @@ class LSQFakeTensorQuantFunction(Function):
         grad_inputs = torch.where((fake_quant_point <= max_bound)*(fake_quant_point >= min_bound), grad_outputs, zero)
 
         grad_scale = -fake_quant_point + fake_quant_point.round()
-        grad_scale = torch.where(grad_scale >= min_bound, grad_scale, min_bound)
-        grad_scale = torch.where(grad_scale <= max_bound, grad_scale, max_bound)
+        grad_scale = torch.where(fake_quant_point >= min_bound, grad_scale, min_bound)
+        grad_scale = torch.where(fake_quant_point <= max_bound, grad_scale, max_bound)
         grad_scale = grad_scale * grad_outputs
         if len(scale.size()) > 0:
             dim = []
@@ -484,8 +484,8 @@ class LSQPLUSFakeTensorQuantFunction(Function):
         grad_inputs = torch.where((fake_quant_point <= max_bound)*(fake_quant_point >= min_bound), grad_outputs, zero)
 
         grad_scale = -fake_quant_point + fake_quant_point.round()
-        grad_scale = torch.where(grad_scale >= min_bound, grad_scale, min_bound)
-        grad_scale = torch.where(grad_scale <= max_bound, grad_scale, max_bound)
+        grad_scale = torch.where(fake_quant_point >= min_bound, grad_scale, min_bound)
+        grad_scale = torch.where(fake_quant_point <= max_bound, grad_scale, max_bound)
 
         ones = grad_outputs.new_ones(1)
         grad_offset = torch.where((fake_quant_point < max_bound)*(fake_quant_point > min_bound), zero, ones)
