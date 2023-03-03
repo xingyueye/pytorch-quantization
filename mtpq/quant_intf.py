@@ -246,7 +246,7 @@ def quant_model_calib_timm(model, data_loader, config, batch_size, predict):
     model.cuda()
     # It is a bit slow since we collect histograms on CPU
 
-    calib_num = min(config.calib_data_nums, len(data_loader.dataset))
+    calib_num = min(config.calib_data_nums, len(data_loader.dataset)) if hasattr(data_loader, 'dataset') else config.calib_data_nums
     calib_batch = calib_num // batch_size
     with torch.no_grad():
         collect_stats(model, data_loader, calib_batch, predict)

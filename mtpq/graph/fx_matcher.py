@@ -263,7 +263,10 @@ class BERTResAddTypePatternMatcher(PatternMatcher):
 
 def _ftswin_get_block_name(node):
     while (node.op != 'call_module'):
-        node = node.args[0]
+        if len(node.args) >0:
+            node = node.args[0]
+        else: 
+            return node.prev.name
     return node.name
 
 class FTSWINQKMatmulTypePatternMatcher(PatternMatcher):
