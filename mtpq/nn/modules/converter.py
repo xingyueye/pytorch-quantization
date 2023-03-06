@@ -22,12 +22,14 @@ class Conv2dConverter(Converter):
         stride = module.stride
         padding = module.padding
         groups = module.groups
+        dilation = module.dilation
         quant_conv = quant_nn.QuantConv2d(in_channels,
                                             out_channels,
                                             kernel_size,
                                             stride,
                                             padding,
                                             groups=groups,
+                                            dilation=dilation,
                                             quant_desc_input = self.quant_desc.input_desc,
                                             quant_desc_weight = self.quant_desc.conv_weight_desc)
 
@@ -56,12 +58,14 @@ class ConvTranspose2dConverter(Converter):
         stride = module.stride
         padding = module.padding
         groups = module.groups
+        dilation = module.dilation
         quant_convtrans = quant_nn.QuantConvTranspose2d(in_channels,
                                                     out_channels,
                                                     kernel_size,
                                                     stride,
                                                     padding,
                                                     groups=groups,
+                                                    dilation=dilation,
                                                     quant_desc_input = self.quant_desc.input_desc,
                                                     quant_desc_weight = self.quant_desc.deconv_weight_desc)
         quant_convtrans.weight.data.copy_(module.weight.detach())
