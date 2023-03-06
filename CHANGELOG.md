@@ -1,4 +1,15 @@
 # Meituan-Pytorch-Quantization Release Changelog
+## 0.1.0-rc 2023-03-06
+****
+### Bug fix
++ Fix backward of LSQ/Stable-LSQ
++ Add dilation to QuantConv2d/QuantConvTranspose2d
+
+### Feature
++ Support unsigned asym quantization
++ Support skip module
+
+
 ## 0.1.0-beta 2023-02-07
 ****
 ### Quantization algorithm  
