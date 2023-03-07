@@ -369,6 +369,13 @@ def write_results(filename, arch, ori_acc, ptq_acc, partial_acc=None, skip_layer
             for layer in skip_layers:
                 cf.write(layer + '\n')
 
+def export_onnx(quantizer, args, data_config):
+    from ast import literal_eval
+    data_shape = (args.export_batch_size,) + data_config['input_size']
+    onnx_path = get_outdir(args.output if args.output else './output/onnx', '')
+    dynamic_axes = literal_eval(args.export_dynamic_axes)
+    quantizer.export_onnx(data_shape, onnx_path, dynamic_axes)
+
 def main():
     # setup_default_logging(default_level=logging.ERROR)
     setup_default_logging()
@@ -708,6 +715,8 @@ def main():
             # quant_model_calib_timm(model, loader_train, config, args.batch_size)
             # quantizer.save_calib_model(args.model, model, config)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
+        if args.export and args.local_rank == 0:
+            export_onnx(quantizer, args, data_config)
         return
 
     if args.partial:
@@ -719,19 +728,18 @@ def main():
             if args.partial_dump:
                 write_results('{}_partial_results.txt'.format(args.model), args.model, ori_acc, ptq_acc, partial_acc, skip_layers, sens_method)
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
-        if not args.export:
-            return
+        if args.export and args.local_rank == 0:
+            export_onnx(quantizer, args, data_config)
+        return
 
     if args.eval:
         validate(model, loader_eval, validate_loss_fn, args, amp_autocast=amp_autocast)
+        if args.export and args.local_rank == 0:
+            export_onnx(quantizer, args, data_config)
         return
 
-    if args.export:
-        from ast import literal_eval
-        data_shape = (args.export_batch_size,) + data_config['input_size']
-        onnx_path = get_outdir(args.output if args.output else './output/onnx', '')
-        dynamic_axes = literal_eval(args.export_dynamic_axes)
-        quantizer.export_onnx(data_shape, onnx_path, dynamic_axes)
+    if args.export and args.local_rank == 0:
+        export_onnx(quantizer, args, data_config)
         return
 
     # setup checkpoint saver and eval metric tracking
