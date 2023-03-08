@@ -189,7 +189,8 @@ def quant_model_init(model, config, calib_weights='', type_str='CNN', do_trace=T
 
     model = custom_ops_replace(model, config, custom_module_map)
     model = quant_ops_replace(model, config, quant_module_map)
-    model = quant_insert_qdq(model, config, type_str, do_trace)
+    if not hasattr(config, 'use_fx') or config.use_fx:
+        model = quant_insert_qdq(model, config, type_str, do_trace)
     if calib_weights:
         state_dict = torch.load(calib_weights, map_location='cpu')
         if 'model' in state_dict.keys():
