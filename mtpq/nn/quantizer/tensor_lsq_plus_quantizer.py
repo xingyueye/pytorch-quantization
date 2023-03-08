@@ -113,7 +113,7 @@ class LSQPlusTensorQuantizer(LSQTensorQuantizer):
 
     def _param_init(self,):
         range = self._amax - self._amin
-        qmax = 2.0**(self._num_bits) - 1.0
+        qmax = 2.0**(self.num_bits - 1 + int(self.unsigned)) - 1.0
         scale = torch.nn.Parameter(range / qmax, requires_grad=True)
         if hasattr(self, '_scale'):
             del self._scale
