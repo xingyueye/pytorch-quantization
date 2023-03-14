@@ -40,6 +40,6 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --nproc
                                     --input-size 3 240 240 \
                                     --output efficientnet_b1_no_jitter_naive \
                                     --distillation-type soft \
-                                    --distillation-scale 2000 \
+                                    ff \
                                     --teacher-model efficientnet_b1 \
                                     --teacher-path  https://s3plus.sankuai.com/automl-model-zoo/huyiming03/efficientnet/efficientnet_b1-533bc792.pth

@@ -12,11 +12,13 @@ a_qscheme:
     quantizer_type: "lsq"    # tensor-quantizer type
     bit: 4
     symmetry: True
+    unsigned: True
     per_channel: False          # default per_tensor for weights
     calib_method: "lsq"   # default 'histogram' for activation calibration
     percentile: 99.99            # used for histogram calibration
     hist_method: 'none'      # 'entropy', 'percentile', 'mse', 'none'
 
+use_fx: False                   # if use torch.fx to trace model
 calib_data_nums: 128            # total number of data used to calibrate the model
 
 partial_ptq:
