@@ -5,6 +5,8 @@ import numpy as np
 import struct
 import sys
 import copy
+import json
+
 
 def search_node_by_output_id(nodes, output_id: str):
     prev_node = None
@@ -218,12 +220,15 @@ def onnx_remove_qdqnode(onnx_model):
                         # print(np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32))
                         val = np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32)[0]
                         if in_name in activation_map.keys():
-                            old_val = struct.unpack('!f', bytes.fromhex(activation_map[in_name]))[0]
+                            old_val = activation_map[in_name]
+                            # old_val = struct.unpack('!f', bytes.fromhex(activation_map[in_name]))[0]
                             # print("Already record, old {:.4f}, new {:.4f}".format(old_val, val))
                             if val > old_val:
-                                activation_map[in_name] = struct.pack('>f', val).hex()
+                                # activation_map[in_name] = struct.pack('>f', val).hex()
+                                activation_map[in_name] = val
                         else:
-                            activation_map[in_name] = struct.pack('>f', val).hex()
+                            # activation_map[in_name] = struct.pack('>f', val).hex()
+                            activation_map[in_name] = val
 
     # Remove QuantizeLinear node
     for quant_node in quant_node_list:
@@ -284,11 +289,25 @@ def onnx_remove_qdqnode(onnx_model):
 
     return onnx_replica, activation_map
 
-def save_calib_cache_file(cache_file, activation_map, headline='TRT-8XXX-EntropyCalibration2\n'):
+def save_calib_cache_file_trt(cache_file, activation_map, headline='TRT-8XXX-EntropyCalibration2\n'):
+    cache_file = cache_file.replace('.onnx', '_calibration.cache')
     with open(os.path.join(cache_file), 'w') as cfile:
         cfile.write(headline)
         for k, v in activation_map.items():
-            cfile.write("{}: {}\n".format(k, v))
+            cfile.write("{}: {}\n".format(k, struct.pack('>f', v).hex()))
+
+def save_calib_cache_file_snpe(cache_file, activation_map):
+    cache_file = cache_file.replace('.onnx', '_clip_ranges.json')
+    clip_ranges = {}
+    for tensor_name, amax in activation_map.items():
+        clip_ranges[tensor_name] = [
+                            {'bitwidth': 8,
+                             'min': float(-amax) * 128,
+                             'max': float(amax) * 127}
+                        ]
+    context = {'activation_encodings': clip_ranges, 'param_encodings': {}}
+    with open(cache_file, 'w') as f:
+            json.dump(context, f, indent=4)
 
 def remove_qdq_nodes_from_qat_onnx(onnx_file):
     model = onnx.load(onnx_file)
@@ -297,8 +316,50 @@ def remove_qdq_nodes_from_qat_onnx(onnx_file):
     onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
     onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
     onnx.save(model_wo_qdq, os.path.join(onnx_dir, onnx_new_name))
-    cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
-    save_calib_cache_file(os.path.join(onnx_dir, cache_name), activation_map)
+    save_calib_cache_file_trt(os.path.join(onnx_dir, onnx_new_name), activation_map)
+
+# val = np.frombuffer(scale_node.attribute[0].t.raw_data, dtype=np.float32)[0]
+#             print(val)
+#             if max < val:
+#                 max = val
+#         # rewrite max scale
+#         for scale_node in scale_node_list:
+#             scale_node.attribute[0].t.raw_data = bytes(struct.pack("f", max))
+
+def fuse_bn_tensor(conv_node, bn_node):
+    a = conv_node
+    # running_mean = branch.running_mean
+    # running_var = branch.running_var
+    # gamma = branch.weight
+    # beta = branch.bias
+    # eps = branch.eps
+    # std = (running_var + eps).sqrt()
+    # t = (gamma / std).reshape(-1, 1, 1, 1)
+    # return kernel * t, beta - running_mean * gamma / std
+
+def merge_conv_bn(onnx_model):
+    onnx_replica = copy.deepcopy(onnx_model)
+    graph = onnx_replica.graph
+    nodes = graph.node
+    # find qualified add op
+    bn_list = []
+    for node_id, node in enumerate(graph.node):
+        if node.op_type == "Conv" and len(node.output)==1:
+            for other_id, other_node in enumerate(nodes):
+                if other_node.op_type == "BatchNormalization" and node.output[0] in other_node.input:
+                    node.output[0] = other_node.output[0]
+                    fuse_bn_tensor(node, other_node)
+                    # for _, _n in enumerate(graph.node):
+                    #     if other_node.output in _n.input:
+                    #         _n.input[_n.input.index(other_node.output)] = node.output
+                    bn_list.append(other_node)
+                    break
+
+    for bn_node in bn_list:
+        graph.node.remove(bn_node)
+        
+    return onnx_replica
+
 
 if __name__ == '__main__':
 
@@ -306,11 +367,15 @@ if __name__ == '__main__':
     model = onnx.load(onnx_file)
     model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
 
+    merged_model = merge_conv_bn(model_wo_qdq)
+
     onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
     onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
     onnx.save(model_wo_qdq, os.path.join(onnx_dir, onnx_new_name))
+    onnx.save(merged_model, os.path.join(onnx_dir, onnx_new_name.replace('.onnx', '_merge_bn.onnx')))
     cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
-    save_calib_cache_file(os.path.join(onnx_dir, cache_name), activation_map)
+    # save_calib_cache_file(os.path.join(onnx_dir, cache_name), activation_map)
+    save_calib_cache_file_snpe(os.path.join(onnx_dir, onnx_new_name), activation_map)
 
 
     # onnx_fuse = onnx_conv_horizon_fuse(model)
