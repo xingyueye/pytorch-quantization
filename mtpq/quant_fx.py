@@ -25,7 +25,7 @@ from mtpq.graph.fx_matcher import PatternMatcherFactory
 #
 #     return model_traced
 
-def insert_qdq_nodes_via_subgraph_match(model, quantizer_desc, type_str='CNN', do_trace=True):
+def get_traced_models(model, type_str='CNN', do_trace=True):
     if do_trace:
         model.eval()
         # We use LowerQuantOpTracer
@@ -33,6 +33,11 @@ def insert_qdq_nodes_via_subgraph_match(model, quantizer_desc, type_str='CNN', d
         model_traced = fx.GraphModule(model, lower_tracer.trace(model))
     else:
         model_traced = model
+
+    return model_traced
+
+def insert_qdq_nodes_via_subgraph_match(model, quantizer_desc, type_str='CNN', do_trace=True):
+    model_traced = get_traced_models(model, type_str='CNN', do_trace=True)
     # Pattern match
     inst_pattern_matcher = PatternMatcherFactory.get_pattern_matcher(type_str)
     for pattern_matcher in inst_pattern_matcher.get_pattern_matchers():

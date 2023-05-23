@@ -187,8 +187,17 @@ def quant_model_init(model, config, calib_weights='', type_str='CNN', do_trace=T
     custom_module_map = get_custom_module_map(type_str)
     quant_module_map = get_quant_module_map(config.quant_layers_type)
 
+
+
+    # Custom Ops replace to avoid some unsupported ops
     model = custom_ops_replace(model, config, custom_module_map)
+
+    # Pattern modules Fuse
+
+    # Quantization Modules replace
     model = quant_ops_replace(model, config, quant_module_map)
+
+    # Pattern match and insert quantization node
     if not hasattr(config, 'use_fx') or config.use_fx:
         model = quant_insert_qdq(model, config, type_str, do_trace)
     if calib_weights:
