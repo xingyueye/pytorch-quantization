@@ -28,5 +28,6 @@ from mtpq.nn.modules.quant_pooling import *
 from mtpq.nn.modules.clip import *
 from mtpq.nn.modules.quant_rnn import *
 from mtpq.nn.modules.quant_instancenorm import *
+from mtpq.nn.modules.quant_conv_bn_fuse import *
 
 from mtpq.nn.modules.layers import *

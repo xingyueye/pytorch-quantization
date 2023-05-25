@@ -56,6 +56,9 @@ _DEFAULT_DE_QUANT_MAP = {
                       "QuantAdaptiveAvgPool2d": nn.AdaptiveAvgPool2d,
                       "QuantAdaptiveAvgPool3d": nn.AdaptiveAvgPool3d}
 
+_DEFAULT_FUSE_PATTERN_MAP = {
+                      "Conv2d": "Conv2dBNFuse",}
+
 def parse_config(config_file):
     with open(config_file) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -165,6 +168,25 @@ def custom_ops_replace(model, config, custom_module_map=_CUSTOM_MAP['CNN']):
             converter = globals()['{}CustomConverter'.format(module_type)](quant_desc)
             set_module(model, k, converter.convert(m))
 
+
+    return model
+
+def fuse_pattern_replace(model, config, custom_module_map=_DEFAULT_FUSE_PATTERN_MAP):
+    quant_desc = get_quant_desc(config)
+
+    for k, m in model.named_modules():
+        if skip_layers_check(k, config):
+            print("Skip Layer {}".format(k))
+            continue
+        module_type = m.__class__.__name__
+        if module_type in custom_module_map.keys():
+            converter = globals()['{}Converter'.format(custom_module_map[module_type])](quant_desc)
+            set_module(model, k, converter.convert(m))
+
+    for k, m in model.named_modules():
+        if isinstance(m, nn.BatchNorm2d) and hasattr(m, 'following_bn') and m.following_bn:
+            set_module(model, k, nn.Identity())
+
     return model
 
 def get_quant_module_map(quant_layers_type=[]):
@@ -177,6 +199,24 @@ def get_quant_module_map(quant_layers_type=[]):
 def get_custom_module_map(type_str):
     return _CUSTOM_MAP[type_str]
 
+def find_conv_bn_patterns(module):
+    named_children = module.named_children()
+    for name, child in named_children:
+        if isinstance(child, nn.Conv2d):
+            try:
+                next_name, next_child = next(named_children)
+            except:
+                next_child = None
+            if isinstance(next_child, nn.BatchNorm2d):
+                setattr(child, 'is_bn_following', True)
+                setattr(next_child, 'following_bn', True)
+                follow_bn = {'bn_name': next_name,
+                             'bn_module': next_child}
+                setattr(child, 'follow_bn', follow_bn)
+            else:
+                setattr(child, 'is_bn_following', False)
+        else:
+            find_conv_bn_patterns(child)
 
 def quant_insert_qdq(model, config, type_str='CNN', do_trace=True):
     quant_desc = get_quant_desc(config)
@@ -187,13 +227,12 @@ def quant_model_init(model, config, calib_weights='', type_str='CNN', do_trace=T
     custom_module_map = get_custom_module_map(type_str)
     quant_module_map = get_quant_module_map(config.quant_layers_type)
 
-
-
     # Custom Ops replace to avoid some unsupported ops
     model = custom_ops_replace(model, config, custom_module_map)
 
     # Pattern modules Fuse
-
+    find_conv_bn_patterns(model)
+    model = fuse_pattern_replace(model, config)
     # Quantization Modules replace
     model = quant_ops_replace(model, config, quant_module_map)
 
@@ -218,22 +257,6 @@ def quant_model_init_mmlab(model, config, calib_weights='', type_str='CNN', do_t
     model_cp.backbone = quant_insert_qdq(model_cp.backbone, config, type_str, do_trace)
     # model_cp.neck = quant_insert_qdq(model_cp.neck, config, type_str, do_trace)
     return model
-
-
-# def bert_quant_insert_qdq(model, config):
-#     quant_desc = get_quant_desc(config)
-#     return bert_insert_qdq_nodes_via_subgraph_match(model, quant_desc.input_desc)
-#
-# def bert_quant_model_init(model, config, calib_weights=''):
-#     # config = parse_config(config_file)
-#     quant_module_map = get_quant_module_map(config.quant_layers_type)
-#
-#     model = quant_ops_replace(model, config, quant_module_map)
-#     model = bert_quant_insert_qdq(model, config)
-#     if calib_weights:
-#         state_dict = torch.load(calib_weights, map_location='cpu')
-#         model.load_state_dict(state_dict['model'].state_dict())
-#     return model
 
 def save_calib_model(model_name, model):
     # Save calibrated checkpoint

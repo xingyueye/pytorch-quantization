@@ -256,4 +256,39 @@ class LinearCustomConverter(Converter):
             quant_linear_ft.bias = None
         return quant_linear_ft
 
+class Conv2dBNFuseConverter(Converter):
+    def convert(self, module):
+        if not module.is_bn_following:
+            return module
+        in_channels = module.in_channels
+        out_channels = module.out_channels
+        kernel_size = module.kernel_size
+        stride = module.stride
+        padding = module.padding
+        groups = module.groups
+        dilation = module.dilation
+        eps = module.follow_bn['bn_module'].eps
+        momentum = module.follow_bn['bn_module'].momentum
+        quant_conv2dbn_fuse = quant_nn.QuantConv2dBNFuse(
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            eps=eps,
+            momentum=momentum,
+            quant_desc_input=self.quant_desc.input_desc,
+            quant_desc_weight=self.quant_desc.conv_weight_desc)
+        quant_conv2dbn_fuse.weight.data.copy_(module.weight.detach())
+        if module.bias is not None:
+            quant_conv2dbn_fuse.bias.data.copy_(module.bias.detach())
+
+        quant_conv2dbn_fuse.bn.weight.data.copy_(module.follow_bn['bn_module'].weight.detach())
+        quant_conv2dbn_fuse.bn.bias.data.copy_(module.follow_bn['bn_module'].bias.detach())
+        quant_conv2dbn_fuse.bn.running_mean.data.copy_(module.follow_bn['bn_module'].running_mean.detach())
+        quant_conv2dbn_fuse.bn.running_var.data.copy_(module.follow_bn['bn_module'].running_var.detach())
+        
+        return quant_conv2dbn_fuse
 
