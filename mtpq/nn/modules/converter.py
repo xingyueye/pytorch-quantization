@@ -284,6 +284,9 @@ class Conv2dBNFuseConverter(Converter):
         quant_conv2dbn_fuse.weight.data.copy_(module.weight.detach())
         if module.bias is not None:
             quant_conv2dbn_fuse.bias.data.copy_(module.bias.detach())
+        else:
+            quant_conv2dbn_fuse.bias = None
+            
 
         quant_conv2dbn_fuse.bn.weight.data.copy_(module.follow_bn['bn_module'].weight.detach())
         quant_conv2dbn_fuse.bn.bias.data.copy_(module.follow_bn['bn_module'].bias.detach())

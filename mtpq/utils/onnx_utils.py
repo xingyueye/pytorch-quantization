@@ -308,7 +308,7 @@ def save_calib_cache_file_snpe(cache_file, activation_map):
     with open(cache_file, 'w') as f:
             json.dump(context, f, indent=4)
 
-def remove_qdq_nodes_from_qat_onnx(onnx_file, benckend='TRT'):
+def remove_qdq_nodes_from_qat_onnx(onnx_file, benckend='SNPE'):
     model = onnx.load(onnx_file)
     model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
 
