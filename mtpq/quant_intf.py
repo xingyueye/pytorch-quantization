@@ -185,7 +185,11 @@ def fuse_pattern_replace(model, config, custom_module_map=_DEFAULT_FUSE_PATTERN_
 
     for k, m in model.named_modules():
         if isinstance(m, nn.BatchNorm2d) and hasattr(m, 'following_bn') and m.following_bn:
-            set_module(model, k, nn.Identity())
+            if hasattr(m,"act"):## FIXME This is just for quick application in SNPE, just suit for EfficientNet 
+                act_layer = m.act
+                set_module(model, k, act_layer)
+            else:
+                set_module(model, k, nn.Identity())
 
     return model
 
