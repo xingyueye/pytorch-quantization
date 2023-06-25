@@ -24,14 +24,15 @@ from absl import logging
 
 from torch import nn
 
-from mtpq.nn import TensorQuantizer, LSQTensorQuantizer, LSQPlusTensorQuantizer, StableLSQTensorQuantizer
+from mtpq.nn import TensorQuantizer, LSQTensorQuantizer, LSQPlusTensorQuantizer, StableLSQTensorQuantizer,TensorQuantizer_asym
 from mtpq.tensor_quant import QuantDescriptor, QUANT_DESC_8BIT_PER_TENSOR
 
 TENSOR_QUANTIZER_MAP={
     "naive": TensorQuantizer,
     "lsq": LSQTensorQuantizer,
     "stable_lsq": StableLSQTensorQuantizer,
-    "lsq_plus": LSQPlusTensorQuantizer
+    "lsq_plus": LSQPlusTensorQuantizer,
+    "naive_asym":TensorQuantizer_asym
 }
 
 class QuantMixin():

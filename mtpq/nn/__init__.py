@@ -20,6 +20,7 @@ from mtpq.nn.quantizer.tensor_quantizer import *
 from mtpq.nn.quantizer.tensor_lsq_quantizer import *
 from mtpq.nn.quantizer.tensor_stable_lsq_quantizer import *
 from mtpq.nn.quantizer.tensor_lsq_plus_quantizer import *
+from mtpq.nn.quantizer.tensor_quantizer_asym import *
 
 from mtpq.nn.modules.quant_conv import *
 from mtpq.nn.modules.quant_linear import *

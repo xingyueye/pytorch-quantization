@@ -73,8 +73,8 @@ class MinMaxCalibrator(_Calibrator):
         for i in range(x.dim()):
             if not i in axis:
                 reduce_axis.append(i)
-        local_amax = quant_utils.reduce_amax(x, axis=reduce_axis).detach()
-        local_amin = quant_utils.reduce_amin(x, axis=reduce_axis).detach()
+        local_amax = quant_utils.reduce_max(x, axis=reduce_axis).detach()
+        local_amin = quant_utils.reduce_min(x, axis=reduce_axis).detach()
 
         if self._calib_amax is None:
             self._calib_amax = local_amax
@@ -93,7 +93,7 @@ class MinMaxCalibrator(_Calibrator):
         self._calib_amax = None
 
     def compute_amax(self, *args, **kwargs):
-        """Return the absolute max of all tensors collected"""
+        """Return the max and min of all tensors collected"""
         return self._calib_amax, self._calib_amin
 
     # pylint:disable=missing-docstring

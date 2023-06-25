@@ -63,6 +63,7 @@ class ScaledQuantDescriptor():
         - calib_method:
         - num_bits:
         - amax:
+        - amin:
         - unsigned:
     """
 
@@ -79,7 +80,7 @@ class ScaledQuantDescriptor():
             raise TypeError("name must be a string or None, not {}.".format(type(name)))
         self._name = name
 
-        self._fake_quant = kwargs.pop('fake_quant', True)
+        self._fake_quant = kwargs.pop('fake_quant', True)#如果kwargs字典中不存在'fake_quant'关键字参数，则将self._fake_quant的值设置为True。这个地方暂时写死，因为都是fakequant
         self._axis = kwargs.pop('axis', None)
         if self._axis is not None:
             logging.debug("Meaning of axis has changed since v2.0. Make sure to update.")
@@ -93,7 +94,11 @@ class ScaledQuantDescriptor():
                     amax, list) and not isinstance(amax, np.ndarray):
                 raise TypeError("amax must be float, list or ndarray, not {}".format(type(amax)))
             # Make it single precision array
-            self._amax = np.array(amax, dtype=np.float32)
+            if isinstance(amax,tuple):
+                self._amax = np.array(amax[0], dtype=np.float32)
+                self._amin = np.array(amax[1], dtype=np.float32)
+            else:
+                self._amax = np.array(amax, dtype=np.float32)
         else:
             self._amax = amax
 
@@ -131,6 +136,10 @@ class ScaledQuantDescriptor():
         return self._amax
 
     @property
+    def amin(self):
+        return self._amin
+
+    @property
     def learn_amax(self):
         return self._learn_amax
 
@@ -163,11 +172,14 @@ class ScaledQuantDescriptor():
         if isinstance(self._amax, torch.Tensor):
             s += " amax={}".format(np.array2string(self._amax.cpu().numpy().flatten(), edgeitems=1,
                                                    formatter={'all': "{:.2e}".format}))
-        if isinstance(self._amin, torch.Tensor):
-            s += " _amin={}".format(np.array2string(self._amin.cpu().numpy().flatten(), edgeitems=1,
-                                                   formatter={'all': "{:.2e}".format}))
         elif self._amax is not None:
             s += " amax={_amax}"
+            s += " full_range"
+        if isinstance(self._amin, torch.Tensor):
+            s += " amin={}".format(np.array2string(self._amin.cpu().numpy().flatten(), edgeitems=1,
+                                                   formatter={'all': "{:.2e}".format}))
+        elif self._amin is not None:
+            s += " amin={_amin}"
             s += " full_range"
         if self._learn_amax:
             s += " learn_amax"
@@ -197,6 +209,8 @@ class ScaledQuantDescriptor():
             obj_dict['axis'] = self._axis
         if self._amax is not None:
             obj_dict['amax'] = self._amax.tolist()
+        if self._amin is not None:
+            obj_dict['amin'] = self._amin.tolist()
         if self._scale_amax is not None:
             obj_dict['scale_amax'] = self._scale_amax
         if self._learn_amax:
@@ -644,7 +658,7 @@ class FakeAffineTensorQuantFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, min_range, max_range, num_bits=8):
+    def forward(ctx, inputs, min_range, max_range,unsigned = False, num_bits=8):
         """
 
         As it will be only applied on activation with per tensor granularity, broadcast is not needed.
@@ -663,9 +677,12 @@ class FakeAffineTensorQuantFunction(Function):
         ctx.save_for_backward(inputs, min_range, max_range)
 
         step_size = (max_range - min_range) / (2.0**num_bits - 1)
-
-        min_bound = -2.0**(num_bits - 1)
-        max_bound = 2.0**(num_bits - 1) - 1
+        if unsigned:
+            min_bound = 0
+            max_bound = 2.0**num_bits - 1
+        else:
+            min_bound = -2.0**(num_bits - 1)
+            max_bound = 2.0**(num_bits - 1) - 1
 
         quant_zero = torch.round(min_range / step_size) - min_bound
         quantized = torch.round(inputs / step_size) - quant_zero

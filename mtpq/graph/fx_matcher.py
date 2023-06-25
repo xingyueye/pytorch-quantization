@@ -1,5 +1,5 @@
 import torch.fx as fx
-from mtpq.nn import TensorQuantizer, LSQTensorQuantizer, StableLSQTensorQuantizer, LSQPlusTensorQuantizer
+from mtpq.nn import TensorQuantizer, LSQTensorQuantizer, StableLSQTensorQuantizer, LSQPlusTensorQuantizer,TensorQuantizer_asym
 from mtpq.graph.fx_pattern import *
 from mtpq.graph import fx_utils
 
@@ -7,7 +7,8 @@ FX_TENSOR_QUANT_MAP = {
     "naive": TensorQuantizer,
     "lsq": LSQTensorQuantizer,
     "stable_lsq": StableLSQTensorQuantizer,
-    "lsq_plus": LSQPlusTensorQuantizer
+    "lsq_plus": LSQPlusTensorQuantizer,
+    "naive_asym":TensorQuantizer_asym
 }
 
 class PatternMatcher(object):
