@@ -344,27 +344,33 @@ class TensorQuantizer_asym(TensorQuantizer):
     def _fb_fake_quant(self, inputs, amax, amin):
         """Native pytorch fake quantization."""
         logging.log_first_n(logging.WARNING, "Use Pytorch's native experimental fake quantization.", 1)
-        bound = (1 << (self._num_bits - 1 + int(self._unsigned))) - 1
+        #bound = (1 << (self._num_bits - 1 + int(self._unsigned))) - 1
+        if self._unsigned:
+            min_bound = 0
+            max_bound = 1 << self._num_bits - 1
+        else:
+            max_bound = (1 << (self._num_bits - 1)) - 1
+            min_bound = -max_bound - 1 
         # To be consistent with ONNX, full range is used. e.g. range is [-128, 127] in int8
         if amax.numel() == 1:
             step_size = (amax- amin) / (2.0**self.num_bits - 1)
-            zero_point = amin/step_size - amin
+            zero_point = max_bound - torch.round(amax/step_size)
             outputs = torch.fake_quantize_per_tensor_affine(
-                inputs, (amax - amin).item() / bound, zero_point,
-                -bound - 1 if not self._unsigned else 0, bound)
+                inputs, step_size.item(), zero_point.int().item(),
+                min_bound, max_bound)
         else:
             amax_sequeeze = amax.squeeze().detach()
             amin_sequeeze = amin.squeeze().detach()
             if len(amax_sequeeze.shape) != 1:
                 raise TypeError("Pytorch's native quantization doesn't support multiple axes")
             quant_dim = list(amax.shape).index(list(amax_sequeeze.shape)[0])
-            scale = (amax_sequeeze - amin_sequeeze) / bound
-            zero_point = amin_sequeeze/scale- amin_sequeeze
+            scale = (amax_sequeeze - amin_sequeeze) / (2.0**self.num_bits - 1)
+            zero_point = torch.round(amin_sequeeze/scale)- min_bound
             # Set dtype of zero_points as "torch.long" for torch.1.9, and "torch.int32" for higher version
             dtype_of_zeropoints = torch.long if '1.9' in torch.__version__ else torch.int32
             outputs = torch.fake_quantize_per_channel_affine(
                 inputs, scale.data, zero_point.data, quant_dim,
-                -bound - 1 if not self._unsigned else 0, bound)
+                min_bound, max_bound)
 
         return outputs
     

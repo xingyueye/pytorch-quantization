@@ -212,6 +212,7 @@ def onnx_remove_qdqnode(onnx_model):
             #    if node.output[0] == zero_name:
             #        graph.node.remove(nodes[i])
             # record scale of activation
+            activation_map[in_name] = [0.,0]
             for i, node in enumerate(graph.node):
                 if node.output[0] == scale_name:
                     if len(node.attribute[0].t.dims) == 0:
@@ -219,15 +220,22 @@ def onnx_remove_qdqnode(onnx_model):
                         # print(np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32))
                         val = np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32)[0]
                         if in_name in activation_map.keys():
-                            old_val = activation_map[in_name]
+                            old_val = activation_map[in_name][0]
                             # old_val = struct.unpack('!f', bytes.fromhex(activation_map[in_name]))[0]
                             # print("Already record, old {:.4f}, new {:.4f}".format(old_val, val))
                             if val > old_val:
                                 # activation_map[in_name] = struct.pack('>f', val).hex()
-                                activation_map[in_name] = val
+                                activation_map[in_name][0] = val
                         else:
                             # activation_map[in_name] = struct.pack('>f', val).hex()
-                            activation_map[in_name] = val
+                            activation_map[in_name][0] = val
+                # record zeropoint of activation
+                if node.output[0] == zero_name:
+                    if len(node.attribute[0].t.dims) == 0:
+                        # print(node.attribute[0].t.raw_data)
+                        # print(np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32))
+                        val = np.frombuffer(node.attribute[0].t.raw_data, dtype=np.int8)[0]
+                        activation_map[in_name][1] = val
 
     # Remove QuantizeLinear node
     for quant_node in quant_node_list:
@@ -298,11 +306,16 @@ def save_calib_cache_file_trt(cache_file, activation_map, headline='TRT-8XXX-Ent
 def save_calib_cache_file_snpe(cache_file, activation_map):
     cache_file = cache_file.replace('.onnx', '_clip_ranges.json')
     clip_ranges = {}
-    for tensor_name, amax in activation_map.items():
+    for tensor_name, [scale, zeropoint] in activation_map.items():   
+        maxbound = 127 #ATTENTION This is just for quick test for, if unsigned need to repair maxbound
+        num_bits = 255
         clip_ranges[tensor_name] = [
                             {'bitwidth': 8,
-                             'min': float(-amax) * 128,
-                             'max': float(amax) * 127}
+                             'max': float((maxbound - zeropoint)*scale),
+                             'min': float((maxbound - zeropoint)*scale - scale*num_bits),
+                             'offset': int(zeropoint),
+                             "scale": float(scale)
+                             }
                         ]
     context = {'activation_encodings': clip_ranges, 'param_encodings': {}}
     with open(cache_file, 'w') as f:

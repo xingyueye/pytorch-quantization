@@ -684,7 +684,7 @@ class FakeAffineTensorQuantFunction(Function):
             min_bound = -2.0**(num_bits - 1)
             max_bound = 2.0**(num_bits - 1) - 1
 
-        quant_zero = torch.round(min_range / step_size) - min_bound
+        quant_zero = max_bound - torch.round(min_range / step_size)
         quantized = torch.round(inputs / step_size) - quant_zero
         quantized = torch.clamp(quantized, min_bound, max_bound)
 

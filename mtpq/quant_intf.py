@@ -303,7 +303,7 @@ def quant_model_calib_bert(model, data_loader, config, batch_size, predict):
 def quant_model_export(model, onnx_path, data_shape, dynamic_axes=None):
     model.eval()
     model.cuda()
-    quant_nn.TensorQuantizer.use_fb_fake_quant = True
+    quant_nn.TensorQuantizer_asym.use_fb_fake_quant = True
     imgs = torch.randn(data_shape).cuda()
     # model_traced = torch.jit.trace(model, imgs)
     torch.onnx.export(model, imgs, onnx_path,
