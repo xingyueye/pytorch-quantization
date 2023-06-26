@@ -111,7 +111,7 @@ class QuantConv2dBNFuse(_QuantConvNd):
         padding = _pair(padding)
         dilation = _pair(dilation)
 
-        quant_desc_input, quant_desc_weight = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)#防止没有定义quant_descriptor而报错
+        quant_desc_input, quant_desc_weight = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
         super(QuantConv2dBNFuse, self).__init__(in_channels, out_channels, kernel_size, stride, padding, dilation, False,
                                           _pair(0), groups, bias, padding_mode,
                                           quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight)
@@ -191,10 +191,6 @@ class QuantConv2dBNFuse(_QuantConvNd):
         else:
             output = F.conv2d(quant_input, quant_weight, fused_bias, self.stride, self.padding, self.dilation,
                               self.groups)
-        # output_ori = F.conv2d(quant_input,self.weight,self.bias,self.stride,self.padding, self.dilation,
-        #                       self.groups)
-        # output_ori = F.batch_norm(output_ori,self.bn.running_mean,self.bn.running_var,self.bn.weight,self.bn.bias,self.bn.training,self.bn.momentum,self.bn.eps)
-        # diff = output_ori - output
         return output
 
 # Define alias with Quant prefix

@@ -80,7 +80,7 @@ class ScaledQuantDescriptor():
             raise TypeError("name must be a string or None, not {}.".format(type(name)))
         self._name = name
 
-        self._fake_quant = kwargs.pop('fake_quant', True)#如果kwargs字典中不存在'fake_quant'关键字参数，则将self._fake_quant的值设置为True。这个地方暂时写死，因为都是fakequant
+        self._fake_quant = kwargs.pop('fake_quant', True)
         self._axis = kwargs.pop('axis', None)
         if self._axis is not None:
             logging.debug("Meaning of axis has changed since v2.0. Make sure to update.")
