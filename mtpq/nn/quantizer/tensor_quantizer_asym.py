@@ -19,7 +19,6 @@ import math
 from absl import logging
 
 import torch
-from torch import nn
 
 from mtpq.tensor_quant import QuantDescriptor, tensor_quant, fake_affine_tensor_quant
 from mtpq.nn.modules.clip import Clip
@@ -122,50 +121,10 @@ class TensorQuantizer_asym(TensorQuantizer):
         self._calibrator = CALIB_METHOD_MAP[quant_desc.calib_method](
                 num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned)
 
-    # pylint:disable=missing-docstring
-    @property
-    def num_bits(self):
-        return self._num_bits
-
-    @property
-    def unsigned(self):
-        return self._unsigned
-
-    @property
-    def amax(self):
-        if not hasattr(self, "_amax"):
-            return None
-        return self._amax
-    
     @property
     def amin(self):
         return self._amin
 
-    @property
-    def step_size(self):
-        if not hasattr(self, "_amax"):
-            logging.error("step_size is undefined under dynamic amax mode!")
-            return None
-        return (self._amax - self._amin) / (2.0**(self._num_bits - 1 + int(self._unsigned)) - 1.0)
-
-    @property
-    def axis(self):
-        return self._axis
-
-    @property
-    def fake_quant(self):
-        return self._fake_quant
-
-    @property
-    def narrow_range(self):
-        return self._narrow_range
-
-    def disable(self):
-        """Bypass the module"""
-        self._disabled = True
-
-    def enable(self):
-        self._disabled = False
 
     def disable_clip(self):
         """Disable clip stage"""
@@ -182,38 +141,6 @@ class TensorQuantizer_asym(TensorQuantizer):
         self.clip.clip_value_max.required_grad = True
         self._if_clip = True
 
-    def disable_calib(self):
-        logging.warning("Disable {}".format(self._calibrator.__class__.__name__))
-        self._if_calib = False
-
-    def enable_calib(self):
-        if self._calibrator is None:
-            raise ValueError("Calibrator was not created, cannot enable calibration.")
-        logging.info("Enable {}".format(self._calibrator.__class__.__name__))
-        self._if_calib = True
-
-    def disable_quant(self):
-        logging.info("Disable `quant` stage.")
-        self._if_quant = False
-
-    def enable_quant(self):
-        logging.info("Enable `quant` stage.")
-        self._if_quant = True
-
-    @amax.setter
-    def amax(self, value):
-        if value is None:
-            logging.error("Setting amax no None is meaningless.")
-        else:
-            if isinstance(value, torch.Tensor):
-                logging.warning("amax setter is not designed to take tensor.")
-            if not hasattr(self, "_amax"):
-                self.register_buffer('_amax', torch.tensor(value))
-            else:
-                value = torch.tensor(value, device=self._amax.device)
-                if self._amax.shape != value.shape:
-                    raise TypeError("Changing shape when setting amax is not allowed.")
-                self._amax.data.copy_(value.data)
     
     @amin.setter
     def amin(self, value):
@@ -230,17 +157,6 @@ class TensorQuantizer_asym(TensorQuantizer):
                     raise TypeError("Changing shape when setting amin is not allowed.")
                 self._amin.data.copy_(value.data)
 
-    @num_bits.setter
-    def num_bits(self, value):
-        self._num_bits = value
-
-    @unsigned.setter
-    def unsigned(self, value):
-        self._unsigned = value
-
-    @narrow_range.setter
-    def narrow_range(self, value):
-        self._narrow_range = value
 
     # pylint:enable=missing-docstring
     def load_calib_amax(self, *args, **kwargs):
@@ -254,8 +170,14 @@ class TensorQuantizer_asym(TensorQuantizer):
         if getattr(self, '_calibrator', None) is None:
             raise RuntimeError("Calibrator not created.")
 
-        calib_amax, calib_amin = self._calibrator.compute_amax(*args, **kwargs)
-
+        #calib_amax, calib_amin = self._calibrator.compute_amax(*args, **kwargs)
+        calib_temp = self._calibrator.compute_amax(*args, **kwargs)
+        if len(calib_temp) == 1:
+            calib_amax, calib_amin = calib_temp, -calib_temp
+        elif len(calib_temp) == 2:
+            calib_amax,calib_amin = calib_temp
+        else:
+            raise RuntimeError(err_msg + " Wrong calibration amax and min shape")
         if calib_amax is None:
             err_msg = "Calibrator returned None. This usually happens when calibrator hasn't seen any tensor."
             if not strict:
@@ -454,22 +376,6 @@ class TensorQuantizer_asym(TensorQuantizer):
             return '{:{fmt}}'.format(self._amin.item(), fmt=fmt)
         return '[{:{fmt}}, {:{fmt}}]({})'.format(self._amin.min().item(), self._amin.max().item(),
                                                  self._amin.numel(), fmt=fmt)
-    def _short_scale(self, fmt='.4f'):
-        """Short description of scale
-
-        Returns:
-            'None': if _scale is not registered
-            'scale': if _scale is per-tensor
-            '[min, max](size)': if _scale is per-channel
-        """
-        if not hasattr(self, '_scale'):
-            return 'None'
-        if self._scale is None:
-            return 'Unintialized'
-        if self._scale.numel() == 1:
-            return '{:{fmt}}'.format(self._scale.item(), fmt=fmt)
-        return '[{:{fmt}}, {:{fmt}}]({})'.format(self._scale.min().item(), self._scale.max().item(),
-                                                 self._scale.numel(), fmt=fmt)
 
     def extra_repr(self):
         if self._disabled:
