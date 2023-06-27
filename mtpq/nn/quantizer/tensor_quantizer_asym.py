@@ -80,7 +80,6 @@ class TensorQuantizer_asym(TensorQuantizer):
 
     # An experimental static switch for using pytorch's native fake quantization
     # Primary usage is to export to ONNX
-    use_fb_fake_quant = False
 
     def __init__(self, quant_desc=QuantDescriptor(), disabled=False, if_quant=True, if_clip=False, if_calib=False):
         """Initialize quantizer and set up required variables"""
