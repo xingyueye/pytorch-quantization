@@ -307,17 +307,15 @@ def save_calib_cache_file_snpe(cache_file, activation_map):
     cache_file = cache_file.replace('.onnx', '_clip_ranges.json')
     clip_ranges = {}
     for tensor_name, [scale, zeropoint] in activation_map.items():   
-        maxbound = 127 #ATTENTION This is just for quick test for, if unsigned need to repair maxbound
+        maxbound = 127 #TODO This is just for quick test for, if unsigned need to repair maxbound
         num_bits = 255
         clip_ranges[tensor_name] = [
                             {'bitwidth': 8,
                              'max': float((maxbound - zeropoint)*scale),
-                             'min': float((maxbound - zeropoint)*scale - scale*num_bits),
-                             'offset': int(zeropoint),
-                             "scale": float(scale)
+                             'min': float((maxbound - zeropoint)*scale - scale*num_bits)
                              }
                         ]
-    context = {'activation_encodings': clip_ranges, 'param_encodings': {}}
+    context = {'activation_encodings': clip_ranges, 'param_encodings': clip_ranges}
     with open(cache_file, 'w') as f:
             json.dump(context, f, indent=4)
 

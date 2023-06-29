@@ -715,7 +715,7 @@ class FakeAffineTensorQuantFunction(Function):
         inputs, min_range, max_range = ctx.saved_tensors
         zero = grad_outputs.new_zeros(1)
         grad_inputs = torch.where((inputs <= max_range)*(inputs >= min_range), grad_outputs, zero)
-        return grad_inputs, None, None, None
+        return grad_inputs, None, None, None, None
 
 
 tensor_quant = TensorQuantFunction.apply
