@@ -1,19 +1,19 @@
 quant_layers_type: []         # nn.Conv2d / nn.Linear / ...
 use_fx: False
 w_qscheme:
-    quantizer_type: "naive"    # tensor-quantizer type : naive/lsq/stable-lsq/lsq-plus
+    quantizer_type: "naive_asym"    # tensor-quantizer type : naive/lsq/stable-lsq/lsq-plus/naive_asym
     bit: 8                          # bit-width
-    symmetry: True                  # default symmetry for TRT
-    per_channel: True               # default per_channle for weights
-    calib_method: "max"             # default 'max' for weights calibration
+    symmetry: False                 # default symmetry for TRT
+    per_channel: False               # default per_channle for weights
+    calib_method: "minmax"             # default 'max' for weights calibration
     percentile: 99.99                # used for histogram calibration
 
 a_qscheme:
-    quantizer_type: "naive"    # tensor-quantizer type
+    quantizer_type: "naive_asym"    # tensor-quantizer type
     bit: 8
-    symmetry: True
+    symmetry: False
     per_channel: False          # default per_tensor for weights
-    calib_method: "histogram"   # default 'histogram' for activation calibration
+    calib_method: "minmax"   # default 'histogram' for activation calibration
     percentile: 99.99            # used for histogram calibration
     hist_method: 'entropy'      # 'entropy', 'percentile', 'mse'
 
