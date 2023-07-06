@@ -129,7 +129,13 @@ docs/gathered
 _site
 doxygen
 docs/dev
-
+*.raw
+*.pt
+*.pth
+*.json
+*.gz
+*.tar
+*.csv
 # LevelDB files
 *.sst
 *.ldb
@@ -160,3 +166,5 @@ caffe2.egg-info
 *.onnx
 *.gv
 *.svg
+*.whl
+*.vsix
