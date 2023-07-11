@@ -258,7 +258,7 @@ class LinearCustomConverter(Converter):
 
 class Conv2dBNFuseConverter(Converter):
     def convert(self, module):
-        if not module.is_bn_following:
+        if not hasattr(module, 'is_bn_following') or not module.is_bn_following :
             return module
         in_channels = module.in_channels
         out_channels = module.out_channels

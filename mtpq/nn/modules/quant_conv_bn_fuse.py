@@ -101,7 +101,7 @@ class QuantConv2dBNFuse(_QuantConvNd):
                  groups=1,
                  eps=1e-05, 
                  momentum=0.1,
-                 bias=None,
+                 bias=True,
                  freeze_bn=False,
                  padding_mode='zeros',
                  **kwargs):
