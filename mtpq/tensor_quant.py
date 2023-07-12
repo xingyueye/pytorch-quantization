@@ -676,9 +676,9 @@ class FakeAffineTensorQuantFunction(Function):
         logging.debug("{} bits quantization on shape {} tensor.".format(num_bits, inputs.size()))
         # expand range so that zero could be represent according SNPE
         if min_range > 0:
-            min_range = 0
+            min_range = torch.tensor(0)
         elif max_range < 0:
-            max_range = 0
+            max_range = torch.tensor(0)
         ctx.save_for_backward(inputs, min_range, max_range)
 
         step_size = (max_range - min_range) / (2.0**num_bits - 1)
