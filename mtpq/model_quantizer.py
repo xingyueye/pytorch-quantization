@@ -40,7 +40,7 @@ class ModelQuantizer:
 
     def _save_calib_weights(self):
         if not self.calib_weights:
-            self.calib_weights = "{}_calib_{}_w{}a{}_{}.pt".format(self.model_name,
+            self.calib_weights = "{}_calib_{}_w{}b{}a{}_{}.pt".format(self.model_name,
                                                           self.quant_config.calib_data_nums,
                                                           self.quant_config.w_qscheme.bit,
                                                           self.quant_config.a_qscheme.bit,
@@ -70,7 +70,8 @@ class ModelQuantizer:
         onnx_path = os.path.join(onnx_path, onnx_name)
         quant_model_export(self.model, onnx_path, data_shape, dynamic_axes=dynamic_axes)
         logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
-        remove_qdq_nodes_from_qat_onnx(onnx_path)
+        unsigned_flag = self.quant_config.a_qscheme.unsigned
+        remove_qdq_nodes_from_qat_onnx(onnx_path,'SNPE',unsigned_flag)
 
 
 class TimmModelQuantizer(ModelQuantizer):
