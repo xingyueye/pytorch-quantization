@@ -40,7 +40,7 @@ class ModelQuantizer:
 
     def _save_calib_weights(self):
         if not self.calib_weights:
-            self.calib_weights = "{}_calib_{}_w{}b{}a{}_{}.pt".format(self.model_name,
+            self.calib_weights = "{}_calib_{}_w{}a{}_{}.pt".format(self.model_name,
                                                           self.quant_config.calib_data_nums,
                                                           self.quant_config.w_qscheme.bit,
                                                           self.quant_config.a_qscheme.bit,
@@ -65,10 +65,10 @@ class ModelQuantizer:
     def export(self):
         pass
 
-    def export_onnx(self, data_shape, onnx_path='./', dynamic_axes=None):
+    def export_onnx(self, data_shape, data_names=[['input'],['output']] ,onnx_path='./', dynamic_axes=None):
         onnx_name = self.calib_weights.replace(".pt", ".onnx") if dynamic_axes is None else self.calib_weights.replace(".pt", "_dynamic.onnx")
         onnx_path = os.path.join(onnx_path, onnx_name)
-        quant_model_export(self.model, onnx_path, data_shape, dynamic_axes=dynamic_axes)
+        quant_model_export(self.model, onnx_path, data_shape, data_names, dynamic_axes=dynamic_axes)
         logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
         unsigned_flag = self.quant_config.a_qscheme.unsigned
         remove_qdq_nodes_from_qat_onnx(onnx_path,'SNPE',unsigned_flag)
@@ -182,7 +182,7 @@ class MMClsModelQuantizer(ModelQuantizer):
         else:
             return [], ori_acc, ptq_acc, 'None'
 
-    def export_onnx(self, data_shape, dynamic_axes=None):
+    def export_onnx(self, data_shape, data_names=[['input'],['output']], dynamic_axes=None):
         onnx_path = self.calib_weights.replace(".pth", ".onnx") if dynamic_axes is None else self.calib_weights.replace(".pth", "_dynamic.onnx")
         model = self.model.module if hasattr(self.model, 'module') else self.model
 
@@ -190,7 +190,7 @@ class MMClsModelQuantizer(ModelQuantizer):
         origin_forward = model.forward
         model.forward = functools.partial(model.forward, img_metas={}, return_loss=False)
         
-        quant_model_export(model, onnx_path, data_shape, dynamic_axes=dynamic_axes)
+        quant_model_export(model, onnx_path, data_shape,data_names, dynamic_axes=dynamic_axes)
         logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 

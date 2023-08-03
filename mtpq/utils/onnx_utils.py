@@ -311,7 +311,7 @@ def onnx_remove_qdqnode(onnx_model,unsigned_flag):
                 #     graph.node.remove(node_input)
                 graph.node.remove(nodes[node_id])
 
-    return onnx_replica, activation_map
+    return onnx_replica, activation_map, weight_map
 
 def save_calib_cache_file_trt(cache_file, activation_map, headline='TRT-8XXX-EntropyCalibration2\n'):
     cache_file = cache_file.replace('.onnx', '_calibration.cache')
@@ -320,25 +320,36 @@ def save_calib_cache_file_trt(cache_file, activation_map, headline='TRT-8XXX-Ent
         for k, v in activation_map.items():
             cfile.write("{}: {}\n".format(k, struct.pack('>f', v).hex()))
 
-def save_calib_cache_file_snpe(cache_file, activation_map):
+def save_calib_cache_file_snpe(cache_file, activation_map, weight_map, unsigned_flag):
     cache_file = cache_file.replace('.onnx', '_clip_ranges.json')
     clip_ranges = {}
+    p_clip_ranges = {}
     for tensor_name, [scale, zeropoint] in activation_map.items():   
-        maxbound = 127 #TODO This is just for quick test for, if unsigned need to repair maxbound
+        maxbound = 127 + int(unsigned_flag)*128
+        minbound = -128 + int(unsigned_flag)*128
         num_bits = 255
         clip_ranges[tensor_name] = [
                             {'bitwidth': 8,
                              'max': float((maxbound - zeropoint)*scale),
-                             'min': float((maxbound - zeropoint)*scale - scale*num_bits)
+                             'min': float((minbound - zeropoint)*scale)
                              }
                         ]
-    context = {'activation_encodings': clip_ranges, 'param_encodings': clip_ranges}
+    for tensor_name, [scale, zeropoint] in weight_map.items():   
+        maxbound = 127 + int(unsigned_flag)*128
+        minbound = -128 + int(unsigned_flag)*128
+        p_clip_ranges[tensor_name] = [
+                            {'bitwidth': 8,
+                             'max': float((maxbound - zeropoint)*scale),
+                             'min': float((minbound - zeropoint)*scale)
+                             }
+                        ]
+    context = {'activation_encodings': clip_ranges, 'param_encodings': p_clip_ranges}
     with open(cache_file, 'w') as f:
             json.dump(context, f, indent=4)
 
-def remove_qdq_nodes_from_qat_onnx(onnx_file, benckend='SNPE'):
+def remove_qdq_nodes_from_qat_onnx(onnx_file, benckend='SNPE',unsigned_flag = False):
     model = onnx.load(onnx_file)
-    model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
+    model_wo_qdq, activation_map, weight_map = onnx_remove_qdqnode(model,unsigned_flag)
 
     onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
     onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
@@ -346,7 +357,7 @@ def remove_qdq_nodes_from_qat_onnx(onnx_file, benckend='SNPE'):
     if benckend == 'TRT':
         save_calib_cache_file_trt(os.path.join(onnx_dir, onnx_new_name), activation_map)
     elif benckend == 'SNPE':
-        save_calib_cache_file_snpe(os.path.join(onnx_dir, onnx_new_name), activation_map)
+        save_calib_cache_file_snpe(os.path.join(onnx_dir, onnx_new_name), activation_map, weight_map,unsigned_flag)
     else:
         NotImplementedError, "UnSupported BENCKEND"
 

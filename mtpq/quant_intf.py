@@ -301,15 +301,15 @@ def quant_model_calib_bert(model, data_loader, config, batch_size, predict):
         collect_stats(model, data_loader, calib_batch, predict)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
-def quant_model_export(model, onnx_path, data_shape, dynamic_axes=None):
+def quant_model_export(model, onnx_path, data_shape, data_names=[['input'],['output']], dynamic_axes=None):
     model.eval()
     model.cuda()
     quant_nn.TensorQuantizer.use_fb_fake_quant = True
     imgs = torch.randn(data_shape).cuda()
     # model_traced = torch.jit.trace(model, imgs)
     torch.onnx.export(model, imgs, onnx_path,
-                      input_names=['input'],
-                      output_names=['output'],
+                      input_names=data_names[0],
+                      output_names=data_names[-1],
                       verbose=False,
                       opset_version=13,
                       do_constant_folding=True,
