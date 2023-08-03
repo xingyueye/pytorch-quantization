@@ -73,8 +73,8 @@ class MinMaxCalibrator(_Calibrator):
         for i in range(x.dim()):
             if not i in axis:
                 reduce_axis.append(i)
-        local_amax = quant_utils.reduce_max(x, axis=reduce_axis).detach()
-        local_amin = quant_utils.reduce_min(x, axis=reduce_axis).detach()
+        local_amax = max(quant_utils.reduce_max(x, axis=reduce_axis).detach(),torch.tensor(0,device=x.device))
+        local_amin = min(quant_utils.reduce_min(x, axis=reduce_axis).detach(),torch.tensor(0,device=x.device))
 
         if self._calib_amax is None:
             self._calib_amax = local_amax

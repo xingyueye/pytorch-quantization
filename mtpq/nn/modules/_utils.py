@@ -205,7 +205,7 @@ class QuantGemmMixin():
         logging.info("Weight is %squantized to %d bits in %s with axis %s!", ""
                      if not quant_desc_weight.fake_quant else "fake ",
                      quant_desc_weight.num_bits, self.__class__.__name__, quant_desc_weight.axis)
-        logging.info("Weight is %squantized to %d bits in %s with axis %s!", ""
+        logging.info("Output is %squantized to %d bits in %s with axis %s!", ""
                      if not quant_desc_output.fake_quant else "fake ",
                      quant_desc_output.num_bits, self.__class__.__name__, quant_desc_output.axis)
 

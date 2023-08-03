@@ -99,8 +99,10 @@ class ScaledQuantDescriptor():
                 self._amin = np.array(amax[1], dtype=np.float32)
             else:
                 self._amax = np.array(amax, dtype=np.float32)
+                self._amin = None
         else:
             self._amax = amax
+            self._amin = None
 
         self._scale_amax = kwargs.pop('scale_amax', None)
         self._calib_method = kwargs.pop('calib_method', "max")

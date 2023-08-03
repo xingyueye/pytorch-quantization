@@ -101,7 +101,8 @@ class TensorQuantizer_asym(TensorQuantizer):
 
         if quant_desc.amax is not None:
             self.register_buffer('_amax', torch.tensor(quant_desc.amax))
-
+        if quant_desc.amin is not None:
+            self.register_buffer('_amin', torch.tensor(quant_desc.amin))
         # Clip module consumes a lot of memory, so only create it if learn_amax is True
         if self._learn_amax:
             
@@ -122,6 +123,8 @@ class TensorQuantizer_asym(TensorQuantizer):
 
     @property
     def amin(self):
+        if not hasattr(self, "_amin"):
+            return None
         return self._amin
 
 
@@ -174,7 +177,7 @@ class TensorQuantizer_asym(TensorQuantizer):
         if len(calib_temp) == 1:
             calib_amax, calib_amin = calib_temp, -calib_temp
         elif len(calib_temp) == 2:
-            calib_amax,calib_amin = calib_temp
+            calib_amax, calib_amin = calib_temp
         else:
             raise RuntimeError(err_msg + " Wrong calibration amax and min shape")
         if calib_amax is None:
@@ -268,7 +271,7 @@ class TensorQuantizer_asym(TensorQuantizer):
         #bound = (1 << (self._num_bits - 1 + int(self._unsigned))) - 1
         if self._unsigned:
             min_bound = 0
-            max_bound = 1 << self._num_bits - 1
+            max_bound = (1 << self._num_bits) - 1
         else:
             max_bound = (1 << (self._num_bits - 1)) - 1
             min_bound = -max_bound - 1 
