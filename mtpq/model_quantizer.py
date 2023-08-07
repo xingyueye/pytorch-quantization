@@ -216,6 +216,101 @@ class MMClsModelQuantizer(ModelQuantizer):
                         self._forward_step(data)
                         pbar.update(1)
 
+class MMSegModelQuantizer(ModelQuantizer):
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
+        super(MMSegModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+
+    def _quant_model_init(self, model, config, calib_weights):
+        return quant_model_init_mmlab(model, config, calib_weights)
+
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
+        multi_task = hasattr(data_loader.dataset, 'cumulative_sizes')
+        batch_idx = None
+        if multi_task:
+            batch_idx = data_loader.dataset.__getattribute__('cumulative_sizes')
+            batch_idx = [i // data_loader.batch_size for i in batch_idx]
+        self.batch_idx = batch_idx
+        quant_model_calib_timm(self.model, data_loader, self.quant_config, batch_size, self._calib_predict)
+        if save_calib_model:
+            self._save_calib_weights()
+
+    def _forward_step(self, images):
+        with torch.no_grad():
+            _ = self.model(return_loss=False, **images)
+
+    def load_calib_weights(self):
+        assert os.path.exists(self.calib_weights), "Calibrated weights {} does not exist, please provide correct file".format(self.calib_weights)
+        state_dict = torch.load(self.calib_weights, map_location='cpu')
+        if 'model' in state_dict.keys():
+            self.model.load_state_dict(state_dict['model'].state_dict())
+        else:
+            self.model.load_state_dict(state_dict)
+
+    def partial_quant(self, eval_loader, eval_func, mini_eval_loader=None):
+        self.quant_disable()
+        ori_acc = eval_func(eval_loader, self.model)
+
+        self.quant_enable()
+        ptq_acc = eval_func(eval_loader, self.model)
+        
+        if ori_acc - ptq_acc > self.quant_config.partial_ptq.drop:
+            if self.quant_config.partial_ptq.sensitivity_method == 'top1':
+                _loader = mini_eval_loader if mini_eval_loader is not None else eval_loader
+                sensitivity_list = top1_sensitivity(self.model, _loader, eval_func)
+                sensitivity_list.sort(key=lambda tup: tup[1], reverse=False)
+            else:
+                sample_image = next(iter(eval_loader))                    
+                sample_func = functools.partial(self._forward_step, images=sample_image)
+                sensitivity_list = fast_sensitivity(self.model, eval_loader, self.quant_config.partial_ptq.sensitivity_method, forward_func=sample_func)
+                sensitivity_list.sort(key=lambda tup: tup[1], reverse=True)
+
+            print(sensitivity_list)
+            skip_layers, partial_acc = do_partial_quant(sensitivity_list,
+                                                         self.model,
+                                                         eval_loader,
+                                                         eval_func,
+                                                         ori_acc,
+                                                         ptq_acc,
+                                                         self.quant_config.partial_ptq.drop)
+
+            return skip_layers, ori_acc, partial_acc, self.quant_config.partial_ptq.sensitivity_method
+        else:
+            return [], ori_acc, ptq_acc, 'None'
+
+    def export_onnx(self, data_shape, dynamic_axes=None):
+        onnx_path = self.calib_weights.replace(".pth", ".onnx") if dynamic_axes is None else self.calib_weights.replace(".pth", "_dynamic.onnx")
+        model = self.model.module if hasattr(self.model, 'module') else self.model
+
+        # replace original forward function
+        origin_forward = model.forward
+        model.forward = functools.partial(model.forward, img_metas={}, return_loss=False)
+        
+        quant_model_export(model, onnx_path, data_shape, dynamic_axes=dynamic_axes)
+        logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
+        remove_qdq_nodes_from_qat_onnx(onnx_path)
+
+        model.forward = origin_forward
+
+    def _save_calib_weights(self):
+        logger.info("Save calibrated models as: {}.".format(self.calib_weights))
+        torch.save(self.model.state_dict(), self.calib_weights)
+
+    def _calib_predict(self, model, calib_dataloader, num_batches):
+        total = num_batches if self.batch_idx is None else len(self.batch_idx)
+
+        with tqdm(total=total) as pbar:
+            for i, data in enumerate(calib_dataloader):
+                if self.batch_idx is None:
+                    data['img'][0] = data['img'][0].to('cuda:0')
+                    self._forward_step(data)
+                    pbar.update(1)
+                    if i >= num_batches:
+                        break
+                else:
+                    if i+1 in self.batch_idx:
+                        data['img'][0] = data['img'][0].to('cuda:0')
+                        self._forward_step(data)
+                        pbar.update(1)
 
 class BERTModelQuantizer(ModelQuantizer):
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
@@ -266,6 +361,6 @@ class FTSWINModelQuantizer(ModelQuantizer):
 class ModelQuantizerFactory(object):
     @classmethod
     def get_model_quantizer(cls, type_str, *args, **kwargs):
-        valid_str_list = ['', 'Timm', 'MMLab', 'BERT', 'FTSWIN', 'MMCls']
+        valid_str_list = ['', 'Timm', 'MMLab', 'BERT', 'FTSWIN', 'MMCls' ,'MMSeg']
         assert type_str in valid_str_list, 'Unsupported {}ModelQuantizer'.format(type_str)
         return eval("{}ModelQuantizer".format(type_str))(*args, **kwargs)
