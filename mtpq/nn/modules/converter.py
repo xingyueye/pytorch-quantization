@@ -57,6 +57,7 @@ class ConvTranspose2dConverter(Converter):
         kernel_size = module.kernel_size
         stride = module.stride
         padding = module.padding
+        output_padding = module.output_padding
         groups = module.groups
         dilation = module.dilation
         quant_convtrans = quant_nn.QuantConvTranspose2d(in_channels,
@@ -64,6 +65,7 @@ class ConvTranspose2dConverter(Converter):
                                                     kernel_size,
                                                     stride,
                                                     padding,
+                                                    output_padding = output_padding,
                                                     groups=groups,
                                                     dilation=dilation,
                                                     quant_desc_input = self.quant_desc.input_desc,

@@ -174,12 +174,18 @@ class TensorQuantizer_asym(TensorQuantizer):
 
         #calib_amax, calib_amin = self._calibrator.compute_amax(*args, **kwargs)
         calib_temp = self._calibrator.compute_amax(*args, **kwargs)
-        if len(calib_temp) == 1:
-            calib_amax, calib_amin = calib_temp, -calib_temp
-        elif len(calib_temp) == 2:
-            calib_amax, calib_amin = calib_temp
-        else:
-            raise RuntimeError(err_msg + " Wrong calibration amax and min shape")
+
+        try:
+            if calib_temp is None:
+                calib_amax, calib_amin = None, None
+            elif isinstance(calib_temp,torch.Tensor):
+                calib_amax, calib_amin = calib_temp, -calib_temp
+            elif (isinstance(calib_temp,list) or isinstance(calib_temp,tuple)) and len(calib_temp) == 2:
+                calib_amax, calib_amin = calib_temp
+        except BaseException as e:
+            print(f'error when dealing with calib_temp ({calib_temp}) in load_calib_amax: {e}')
+            exit(-1)
+
         if calib_amax is None:
             err_msg = "Calibrator returned None. This usually happens when calibrator hasn't seen any tensor."
             if not strict:
