@@ -305,7 +305,10 @@ def quant_model_export(model, onnx_path, data_shape, data_names=[['input'],['out
     model.eval()
     model.cuda()
     quant_nn.TensorQuantizer.use_fb_fake_quant = True
-    imgs = torch.randn(data_shape).cuda()
+    if isinstance(data_shape[0], list) or isinstance(data_shape[0], tuple):
+        imgs = tuple([torch.rand(s).cuda() for s in data_shape])
+    else:
+        imgs = torch.randn(data_shape).cuda()
     # model_traced = torch.jit.trace(model, imgs)
     torch.onnx.export(model, imgs, onnx_path,
                       input_names=data_names[0],
