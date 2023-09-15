@@ -200,6 +200,7 @@ def onnx_remove_qdqnode(onnx_model,unsigned_flag):
             act_scale = node.input[1]
             act_zp = node.input[2]
             Q_dict[out_name] = [act_node, act_scale, act_zp]
+            print(f'q dict register {out_name}: {act_node}')
             activation_map[act_node] = [0.,0]
             for i in range(node_id):
                 if nodes[i].output[0] == act_scale:
@@ -225,6 +226,7 @@ def onnx_remove_qdqnode(onnx_model,unsigned_flag):
             in_name = node.input[0]
             out_name = node.output[0]
             DQ_dict[out_name] = in_name
+            print(f'dq dict register {out_name}')
             
     for node_id, node in enumerate(graph.node):
         if node.op_type == "Conv" or node.op_type == "Gemm":
