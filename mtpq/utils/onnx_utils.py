@@ -227,13 +227,13 @@ def onnx_remove_qdqnode(onnx_model,unsigned_flag):
             out_name = node.output[0]
             DQ_dict[out_name] = in_name
             print(f'dq dict register {out_name}')
-            
-    for node_id, node in enumerate(graph.node):
-        if node.op_type == "Conv" or node.op_type == "Gemm":
+        else:
             in_name = node.input[0]
             weight_name = node.input[1]
             out_name = node.output[0]
             
+            if weight_name not in DQ_dict:
+                continue
             weight_node = Q_dict[DQ_dict[weight_name]][0]
             weight_scale = Q_dict[DQ_dict[weight_name]][1]
             weight_zp = Q_dict[DQ_dict[weight_name]][2]
