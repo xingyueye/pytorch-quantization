@@ -120,6 +120,9 @@ class StableLSQTensorQuantizer(LSQTensorQuantizer):
         self._scale = self._scale.to(inputs.device)
         step_size = self._scale ** 2
         _scale = GradScaleFunction.apply(step_size, self.scale_for_grad)
+        self.max_bound = self.max_bound.to(inputs.device)
+        # print(f'show dev: inputs: {inputs.device}, self scale: {self._scale.device}, _scale: {_scale.device}, self.max_bound: {self.max_bound.device}')
+        
         amax = _scale * self.max_bound
 
         if self._fake_quant:
