@@ -24,14 +24,16 @@ from absl import logging
 
 from torch import nn
 
-from mtpq.nn import TensorQuantizer, LSQTensorQuantizer, LSQPlusTensorQuantizer, StableLSQTensorQuantizer
+from mtpq.nn import TensorQuantizer, LSQTensorQuantizer, LSQPlusTensorQuantizer, StableLSQTensorQuantizer, TensorQuantizer_asym, AdaRoundQuantizer
 from mtpq.tensor_quant import QuantDescriptor, QUANT_DESC_8BIT_PER_TENSOR
 
 TENSOR_QUANTIZER_MAP={
     "naive": TensorQuantizer,
     "lsq": LSQTensorQuantizer,
     "stable_lsq": StableLSQTensorQuantizer,
-    "lsq_plus": LSQPlusTensorQuantizer
+    "lsq_plus": LSQPlusTensorQuantizer,
+    "naive_asym":TensorQuantizer_asym,
+    'adaround':AdaRoundQuantizer
 }
 
 class QuantMixin():
@@ -204,7 +206,7 @@ class QuantGemmMixin():
         logging.info("Weight is %squantized to %d bits in %s with axis %s!", ""
                      if not quant_desc_weight.fake_quant else "fake ",
                      quant_desc_weight.num_bits, self.__class__.__name__, quant_desc_weight.axis)
-        logging.info("Weight is %squantized to %d bits in %s with axis %s!", ""
+        logging.info("Output is %squantized to %d bits in %s with axis %s!", ""
                      if not quant_desc_output.fake_quant else "fake ",
                      quant_desc_output.num_bits, self.__class__.__name__, quant_desc_output.axis)
 

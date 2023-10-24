@@ -5,6 +5,7 @@ import numpy as np
 import struct
 import sys
 import copy
+import json
 
 def search_node_by_output_id(nodes, output_id: str):
     prev_node = None
@@ -174,10 +175,7 @@ def onnx_add_insert_qdqnode(onnx_model):
         #                                         name=prev_add_node.name + "_DequantizeLinear")
 
 
-
-
-
-def onnx_remove_qdqnode(onnx_model):
+def onnx_remove_qdqnode_ada(onnx_model,unsigned_flag):
     onnx_replica = copy.deepcopy(onnx_model)
     graph = onnx_replica.graph
     nodes = graph.node
@@ -186,44 +184,45 @@ def onnx_remove_qdqnode(onnx_model):
     in_rename_map = {}
     scale_node_list = []
     zero_node_list = []
-    activation_map = {}
     quant_node_list = []
+    Q_dict = {}
+    DQ_dict = {}
+    
+    activation_map = {}
+    weight_map = {}
     for node_id, node in enumerate(graph.node):
         if node.op_type == "QuantizeLinear":
-            # node input
-            in_name = node.input[0]
-            scale_name = node.input[1]
-            zero_name = node.input[2]
-            # print(scale_name)
-            # node output
             out_name = node.output[0]
+            act_node = node.input[0]
+            act_scale = node.input[1]
+            act_zp = node.input[2]
+            Q_dict[out_name] = [act_node, act_scale, act_zp]
+            activation_map[act_node] = [0.,0]
+            for i in range(node_id):
+                if nodes[i].output[0] == act_scale:
+                    val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.float32)[0]
+                    if act_node in activation_map.keys():
+                        old_val = activation_map[act_node][0]
+                        if val > old_val:
+                            activation_map[act_node][0] = val
+                    else: 
+                        activation_map[act_node][0] = val
+                elif nodes[i].output[0] == act_zp:
+                    if unsigned_flag:
+                        val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.uint8)[0]
+                    else:
+                        val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.int8)[0]
+                    activation_map[act_node][1] = val 
             # record input, remove one node, set node's input to its next
-            in_rename_map[out_name] = in_name
-            scale_node_list.append(scale_name)
-            zero_node_list.append(zero_name)
+            in_rename_map[out_name] = act_node
+            scale_node_list.append(act_scale)
+            zero_node_list.append(act_zp)
             quant_node_list.append(node)
-            # for i, node in enumerate(graph.node):
-            #     if node.output[0] == scale_name:
-            #         if len(node.attribute[0].t.dims) > 0:
-            #             print(node.attribute[0].t.dims)
-            #         graph.node.remove(nodes[i])
-            # for i, node in enumerate(graph.node):
-            #    if node.output[0] == zero_name:
-            #        graph.node.remove(nodes[i])
-            # record scale of activation
-            for i, node in enumerate(graph.node):
-                if node.output[0] == scale_name:
-                    if len(node.attribute[0].t.dims) == 0:
-                        # print(node.attribute[0].t.raw_data)
-                        # print(np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32))
-                        val = np.frombuffer(node.attribute[0].t.raw_data, dtype=np.float32)[0]
-                        if in_name in activation_map.keys():
-                            old_val = struct.unpack('!f', bytes.fromhex(activation_map[in_name]))[0]
-                            # print("Already record, old {:.4f}, new {:.4f}".format(old_val, val))
-                            if val > old_val:
-                                activation_map[in_name] = struct.pack('>f', val).hex()
-                        else:
-                            activation_map[in_name] = struct.pack('>f', val).hex()
+        elif node.op_type == "DequantizeLinear":
+            in_name = node.input[0]
+            out_name = node.output[0]
+            DQ_dict[out_name] = in_name
+
 
     # Remove QuantizeLinear node
     for quant_node in quant_node_list:
@@ -282,23 +281,206 @@ def onnx_remove_qdqnode(onnx_model):
                 #     graph.node.remove(node_input)
                 graph.node.remove(nodes[node_id])
 
-    return onnx_replica, activation_map
+    return onnx_replica, activation_map, weight_map
 
-def save_calib_cache_file(cache_file, activation_map, headline='TRT-8XXX-EntropyCalibration2\n'):
+def onnx_remove_qdqnode(onnx_model,unsigned_flag):
+    onnx_replica = copy.deepcopy(onnx_model)
+    graph = onnx_replica.graph
+    nodes = graph.node
+
+    # demo for remove node with first input and output
+    in_rename_map = {}
+    scale_node_list = []
+    zero_node_list = []
+    quant_node_list = []
+    Q_dict = {}
+    DQ_dict = {}
+    
+    activation_map = {}
+    weight_map = {}
+    for node_id, node in enumerate(graph.node):
+        if node.op_type == "QuantizeLinear":
+            out_name = node.output[0]
+            act_node = node.input[0]
+            act_scale = node.input[1]
+            act_zp = node.input[2]
+            Q_dict[out_name] = [act_node, act_scale, act_zp]
+            activation_map[act_node] = [0.,0]
+            for i in range(node_id):
+                if nodes[i].output[0] == act_scale:
+                    val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.float32)[0]
+                    if act_node in activation_map.keys():
+                        old_val = activation_map[act_node][0]
+                        if val > old_val:
+                            activation_map[act_node][0] = val
+                    else: 
+                        activation_map[act_node][0] = val
+                elif nodes[i].output[0] == act_zp:
+                    if unsigned_flag:
+                        val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.uint8)[0]
+                    else:
+                        val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.int8)[0]
+                    activation_map[act_node][1] = val 
+            # record input, remove one node, set node's input to its next
+            in_rename_map[out_name] = act_node
+            scale_node_list.append(act_scale)
+            zero_node_list.append(act_zp)
+            quant_node_list.append(node)
+        elif node.op_type == "DequantizeLinear":
+            in_name = node.input[0]
+            out_name = node.output[0]
+            DQ_dict[out_name] = in_name
+        elif node.op_type == "Conv" or node.op_type == "Gemm":
+            in_name = node.input[0]
+            weight_name = node.input[1]
+            out_name = node.output[0]
+            
+            weight_node = Q_dict[DQ_dict[weight_name]][0]
+            weight_scale = Q_dict[DQ_dict[weight_name]][1]
+            weight_zp = Q_dict[DQ_dict[weight_name]][2]
+            # delete the weight and bias in activation map
+            del activation_map[weight_node]
+            
+            weight_map[weight_node] = [0.,0]
+            for i in range(node_id):
+                if nodes[i].output[0] == weight_scale:
+                    val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.float32)[0]
+                    if weight_node in weight_map.keys():
+                        old_val = weight_map[weight_node][0]
+                        if val > old_val:
+                            weight_map[weight_node][0] = val
+                    else: 
+                        weight_map[weight_node][0] = val
+                elif nodes[i].output[0] == weight_zp:
+                    if unsigned_flag:
+                        val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.uint8)[0]
+                    else:
+                        val = np.frombuffer(nodes[i].attribute[0].t.raw_data, dtype=np.int8)[0]
+                    weight_map[weight_node][1] = val
+
+
+    # Remove QuantizeLinear node
+    for quant_node in quant_node_list:
+        graph.node.remove(quant_node)
+
+
+    # relink
+    for node_id, node in enumerate(graph.node):
+       for in_id, in_name in enumerate(node.input):
+           if in_name in in_rename_map.keys():
+               # set node input == removed node's input
+               node.input[in_id] = in_rename_map[in_name]
+
+    in_rename_map = {}
+    # activation_map = {}
+    dequant_node_list = []
+    for node_id, node in enumerate(graph.node):
+       if node.op_type == "DequantizeLinear":
+           in_name = node.input[0]
+           scale_name = node.input[1]
+           zero_name = node.input[2]
+           # print(scale_name)
+           out_name = node.output[0]
+           in_rename_map[out_name] = in_name
+           # remove later
+           dequant_node_list.append(node)
+           scale_node_list.append(scale_name)
+           zero_node_list.append(zero_name)
+
+    # Remove DequantizeLinear node
+    for dequant_node in dequant_node_list:
+        graph.node.remove(dequant_node)
+
+    # relink
+    for node_id, node in enumerate(graph.node):
+       for in_id, in_name in enumerate(node.input):
+           if in_name in in_rename_map.keys():
+               node.input[in_id] = in_rename_map[in_name]
+
+    nodes = graph.node
+    for node_name in (scale_node_list + zero_node_list):
+        for node_id, node in enumerate(graph.node):
+            if node.name == node_name:
+                # print("node input={}".format(node.input))
+                # for node_input in node.input:
+                #     print(node_input)
+                #     graph.node.remove(node_input)
+                graph.node.remove(nodes[node_id])
+
+    for node_name in (scale_node_list + zero_node_list):
+        for node_id, node in enumerate(graph.node):
+            if node.output[0] == node_name:
+                # print("node input={}".format(node.input))
+                # for node_input in node.input:
+                #     print(node_input)
+                #     graph.node.remove(node_input)
+                graph.node.remove(nodes[node_id])
+
+    return onnx_replica, activation_map, weight_map
+
+def save_calib_cache_file_trt(cache_file, activation_map, headline='TRT-8XXX-EntropyCalibration2\n'):
+    cache_file = cache_file.replace('.onnx', '_calibration.cache')
     with open(os.path.join(cache_file), 'w') as cfile:
         cfile.write(headline)
         for k, v in activation_map.items():
-            cfile.write("{}: {}\n".format(k, v))
+            if len(v) == 2:
+                v = v[0]
+            cfile.write("{}: {}\n".format(k, struct.pack('>f', v).hex()))
 
-def remove_qdq_nodes_from_qat_onnx(onnx_file):
+def save_calib_cache_file_snpe(cache_file, activation_map, weight_map, unsigned_flag):
+    cache_file = cache_file.replace('.onnx', '_clip_ranges.json')
+    clip_ranges = {}
+    p_clip_ranges = {}
+    for tensor_name, [scale, zeropoint] in activation_map.items():   
+        maxbound = 127 + int(unsigned_flag)*128
+        minbound = -128 + int(unsigned_flag)*128
+        num_bits = 255
+        clip_ranges[tensor_name] = [
+                            {'bitwidth': 8,
+                             'max': float((maxbound - zeropoint)*scale),
+                             'min': float((minbound - zeropoint)*scale)
+                             }
+                        ]
+    for tensor_name, [scale, zeropoint] in weight_map.items():   
+        maxbound = 127 + int(unsigned_flag)*128
+        minbound = -128 + int(unsigned_flag)*128
+        p_clip_ranges[tensor_name] = [
+                            {'bitwidth': 8,
+                             'max': float((maxbound - zeropoint)*scale),
+                             'min': float((minbound - zeropoint)*scale)
+                             }
+                        ]
+    context = {'activation_encodings': clip_ranges, 'param_encodings': p_clip_ranges}
+    with open(cache_file, 'w') as f:
+            json.dump(context, f, indent=4)
+
+def remove_qdq_nodes_from_qat_onnx(onnx_file, benckend='TRT',unsigned_flag = False):
     model = onnx.load(onnx_file)
-    model_wo_qdq, activation_map = onnx_remove_qdqnode(model)
+    model_wo_qdq, activation_map, weight_map = onnx_remove_qdqnode(model,unsigned_flag)
 
     onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
     onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
     onnx.save(model_wo_qdq, os.path.join(onnx_dir, onnx_new_name))
-    cache_name = onnx_new_name.replace('.onnx', '_calibration.cache')
-    save_calib_cache_file(os.path.join(onnx_dir, cache_name), activation_map)
+    if benckend == 'TRT':
+        save_calib_cache_file_trt(os.path.join(onnx_dir, onnx_new_name), activation_map)
+    elif benckend == 'SNPE':
+        save_calib_cache_file_snpe(os.path.join(onnx_dir, onnx_new_name), activation_map, weight_map,unsigned_flag)
+    else:
+        NotImplementedError, "UnSupported BENCKEND"
+def remove_qdq_nodes_from_onnx_ada(onnx_file, benckend='TRT',unsigned_flag = False):
+    model = onnx.load(onnx_file)
+    model_wo_qdq, activation_map, weight_map = onnx_remove_qdqnode_ada(model,unsigned_flag)
+
+    onnx_name, onnx_dir = os.path.basename(onnx_file), os.path.dirname(onnx_file)
+    onnx_new_name = onnx_name.replace('.onnx', '_remove_qdq.onnx')
+    onnx.save(model_wo_qdq, os.path.join(onnx_dir, onnx_new_name))
+    if benckend == 'TRT':
+        save_calib_cache_file_trt(os.path.join(onnx_dir, onnx_new_name), activation_map)
+    elif benckend == 'SNPE':
+        save_calib_cache_file_snpe(os.path.join(onnx_dir, onnx_new_name), activation_map, weight_map,unsigned_flag)
+    else:
+        NotImplementedError, "UnSupported BENCKEND"
+
 
 if __name__ == '__main__':
 

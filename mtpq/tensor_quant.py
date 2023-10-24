@@ -63,6 +63,7 @@ class ScaledQuantDescriptor():
         - calib_method:
         - num_bits:
         - amax:
+        - amin:
         - unsigned:
     """
 
@@ -93,14 +94,21 @@ class ScaledQuantDescriptor():
                     amax, list) and not isinstance(amax, np.ndarray):
                 raise TypeError("amax must be float, list or ndarray, not {}".format(type(amax)))
             # Make it single precision array
-            self._amax = np.array(amax, dtype=np.float32)
+            if isinstance(amax,tuple):
+                self._amax = np.array(amax[0], dtype=np.float32)
+                self._amin = np.array(amax[1], dtype=np.float32)
+            else:
+                self._amax = np.array(amax, dtype=np.float32)
+                self._amin = None
         else:
             self._amax = amax
+            self._amin = None
 
         self._scale_amax = kwargs.pop('scale_amax', None)
         self._calib_method = kwargs.pop('calib_method', "max")
         self._unsigned = kwargs.pop('unsigned', False)
         self._narrow_range = kwargs.pop('narrow_range', False)
+        self._symmetry = kwargs.pop('symmetry', True)
 
         # add learn_scale configs
         self.quantizer_type = kwargs.pop('quantizer_type', 'naive')     # lsq / stable_lsq / lsq_plus / naive
@@ -131,6 +139,10 @@ class ScaledQuantDescriptor():
         return self._amax
 
     @property
+    def amin(self):
+        return self._amin
+
+    @property
     def learn_amax(self):
         return self._learn_amax
 
@@ -153,6 +165,10 @@ class ScaledQuantDescriptor():
     @property
     def narrow_range(self):
         return self._narrow_range
+    
+    @property
+    def symmetry(self):
+        return self._symmetry
     # pylint:enable=missing-docstring
 
     def __str__(self):
@@ -163,16 +179,21 @@ class ScaledQuantDescriptor():
         if isinstance(self._amax, torch.Tensor):
             s += " amax={}".format(np.array2string(self._amax.cpu().numpy().flatten(), edgeitems=1,
                                                    formatter={'all': "{:.2e}".format}))
-        if isinstance(self._amin, torch.Tensor):
-            s += " _amin={}".format(np.array2string(self._amin.cpu().numpy().flatten(), edgeitems=1,
-                                                   formatter={'all': "{:.2e}".format}))
         elif self._amax is not None:
             s += " amax={_amax}"
+            s += " full_range"
+        if isinstance(self._amin, torch.Tensor):
+            s += " amin={}".format(np.array2string(self._amin.cpu().numpy().flatten(), edgeitems=1,
+                                                   formatter={'all': "{:.2e}".format}))
+        elif self._amin is not None:
+            s += " amin={_amin}"
             s += " full_range"
         if self._learn_amax:
             s += " learn_amax"
         if self._scale_amax:
             s += " scale_amax={_scale_amax}"
+        if self._symmetry:
+            s += " symmetry = {_symmetry}"
         s += ")"
         return s.format(**self.__dict__)
 
@@ -197,12 +218,16 @@ class ScaledQuantDescriptor():
             obj_dict['axis'] = self._axis
         if self._amax is not None:
             obj_dict['amax'] = self._amax.tolist()
+        if self._amin is not None:
+            obj_dict['amin'] = self._amin.tolist()
         if self._scale_amax is not None:
             obj_dict['scale_amax'] = self._scale_amax
         if self._learn_amax:
             obj_dict['learn_amax'] = self._learn_amax
         if self._unsigned:
             obj_dict['unsigned'] = self._unsigned
+        if self._symmetry:
+            obj_dict['symmetry'] = self._symmetry
 
         return obj_dict
 
@@ -644,7 +669,7 @@ class FakeAffineTensorQuantFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, min_range, max_range, num_bits=8):
+    def forward(ctx, inputs, min_range, max_range,unsigned = False, num_bits=8):
         """
 
         As it will be only applied on activation with per tensor granularity, broadcast is not needed.
@@ -660,18 +685,30 @@ class FakeAffineTensorQuantFunction(Function):
             outputs: A Tensor of type output_dtype
         """
         logging.debug("{} bits quantization on shape {} tensor.".format(num_bits, inputs.size()))
+        # expand range so that zero could be represent according SNPE
+        if min_range > 0:
+            min_range = torch.tensor(0)
+        elif max_range < 0:
+            max_range = torch.tensor(0)
         ctx.save_for_backward(inputs, min_range, max_range)
 
         step_size = (max_range - min_range) / (2.0**num_bits - 1)
-
-        min_bound = -2.0**(num_bits - 1)
-        max_bound = 2.0**(num_bits - 1) - 1
-
-        quant_zero = torch.round(min_range / step_size) - min_bound
-        quantized = torch.round(inputs / step_size) - quant_zero
+        if unsigned:
+            min_bound = 0
+            max_bound = 2.0**num_bits - 1
+        else:
+            min_bound = -2.0**(num_bits - 1)
+            max_bound = 2.0**(num_bits - 1) - 1
+        # add shift so that zeropoint could be specifically represent
+        shift_range = (max_range / step_size - torch.round(max_range / step_size))* step_size
+        min_range = min_range + shift_range
+        max_range = max_range + shift_range
+        
+        quant_zero = max_bound - torch.round(max_range / step_size)
+        quantized = torch.round(inputs / step_size) + quant_zero
         quantized = torch.clamp(quantized, min_bound, max_bound)
 
-        outputs = (quantized + quant_zero) * step_size
+        outputs = (quantized - quant_zero) * step_size
 
         return outputs
 
@@ -689,7 +726,7 @@ class FakeAffineTensorQuantFunction(Function):
         inputs, min_range, max_range = ctx.saved_tensors
         zero = grad_outputs.new_zeros(1)
         grad_inputs = torch.where((inputs <= max_range)*(inputs >= min_range), grad_outputs, zero)
-        return grad_inputs, None, None, None
+        return grad_inputs, None, None, None, None
 
 
 tensor_quant = TensorQuantFunction.apply

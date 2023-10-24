@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from mtpq.quant_intf import *
 from mtpq.quant_partial import top1_sensitivity, fast_sensitivity, do_partial_quant
 from mtpq.quant_utils import model_quant_enable, model_quant_disable, set_quantizer_by_name
-from mtpq.utils.onnx_utils import remove_qdq_nodes_from_qat_onnx
+from mtpq.utils.onnx_utils import remove_qdq_nodes_from_qat_onnx,remove_qdq_nodes_from_onnx_ada
 
 
 class ModelQuantizer:
@@ -72,6 +72,26 @@ class ModelQuantizer:
         logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 
+class AdaRoundModelQuantizer(ModelQuantizer):
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
+        super(AdaRoundModelQuantizer,self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+        
+    def _forward_step(self, images):
+        with torch.no_grad():
+            _ = self.model(images.to(next(self.model.parameters()).device))
+            
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
+        quant_model_calib_adaround(self.model, data_loader, self.quant_config, batch_size, custom_predict)
+        if save_calib_model:
+            self._save_calib_weights()
+
+    def export_onnx(self, data_shape, data_names=[['input'],['output']] ,onnx_path='./', dynamic_axes=None):
+        onnx_name = self.calib_weights.replace(".pt", ".onnx") if dynamic_axes is None else self.calib_weights.replace(".pt", "_dynamic.onnx")
+        onnx_path = os.path.join(onnx_path, onnx_name)
+        quant_model_export(self.model, onnx_path, data_shape, data_names, dynamic_axes=dynamic_axes)
+        logger.info("Export QAT models with QDQ nodes as {}".format(onnx_path))
+        unsigned_flag = self.quant_config.a_qscheme.unsigned
+        remove_qdq_nodes_from_onnx_ada(onnx_path,'SNPE',unsigned_flag)
 
 class TimmModelQuantizer(ModelQuantizer):
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
@@ -361,6 +381,6 @@ class FTSWINModelQuantizer(ModelQuantizer):
 class ModelQuantizerFactory(object):
     @classmethod
     def get_model_quantizer(cls, type_str, *args, **kwargs):
-        valid_str_list = ['', 'Timm', 'MMLab', 'BERT', 'FTSWIN', 'MMCls' ,'MMSeg']
+        valid_str_list = ['', 'Timm', 'MMLab', 'BERT', 'FTSWIN', 'MMCls' ,'MMSeg', 'AdaRound']
         assert type_str in valid_str_list, 'Unsupported {}ModelQuantizer'.format(type_str)
         return eval("{}ModelQuantizer".format(type_str))(*args, **kwargs)

@@ -20,5 +20,6 @@
 
 from .reduce_amax import reduce_amax
 from .reduce_amax import reduce_abs_mean
-from .reduce_amax import reduce_amin
+from .reduce_amax import reduce_min
+from .reduce_amax import reduce_max
 

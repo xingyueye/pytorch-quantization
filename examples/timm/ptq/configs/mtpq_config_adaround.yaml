@@ -1,23 +1,24 @@
 quant_layers_type: []         # nn.Conv2d / nn.Linear / ...
-
+use_fx: False
 w_qscheme:
-    quantizer_type: "naive"    # tensor-quantizer type : naive/lsq/stable-lsq/lsq-plus
+    quantizer_type: "adaround"    # tensor-quantizer type : naive/lsq/stable-lsq/lsq-plus/naive_asym
     bit: 8                          # bit-width
-    symmetry: True                  # default symmetry for TRT
+    symmetry: False                 # default symmetry for TRT
     per_channel: False               # default per_channle for weights
-    calib_method: "max"             # default 'max' for weights calibration
-    percentile: 99.99                # used for histogram calibration
-
-a_qscheme:
-    quantizer_type: "naive"    # tensor-quantizer type
-    bit: 8
-    symmetry: True
-    per_channel: False          # default per_tensor for weights
-    calib_method: "histogram"   # default 'histogram' for activation calibration
+    calib_method: "minmax"   # default 'histogram' for activation calibration
     percentile: 99.99            # used for histogram calibration
-    hist_method: 'percentile'      # 'entropy', 'percentile', 'mse'
-
-calib_data_nums: 80            # total number of data used to calibrate the model
+    hist_method: 'entropy'      # 'entropy', 'percentile', 'mse'
+    unsigned: True
+a_qscheme:
+    quantizer_type: "naive_asym"    # tensor-quantizer type
+    bit: 8
+    symmetry: False
+    per_channel: False          # default per_tensor for weights
+    calib_method: "minmax"   # default 'histogram' for activation calibration
+    percentile: 99.99            # used for histogram calibration
+    hist_method: 'entropy'      # 'entropy', 'percentile', 'mse'
+    unsigned: True
+calib_data_nums: 128            # total number of data used to calibrate the model
 
 partial_ptq:
     sensitivity_method: "mse"   #'mse', 'cosine', 'top1', 'snr'
@@ -25,7 +26,7 @@ partial_ptq:
     skip_ratio: 0.1             # max proportion of skipped sensetive layers
 
 quant_layers: []              # manually specify quantized layers
-skip_layers: ['patch_embed.proj', 'head']   # manually specify skipped layers
+skip_layers: []               # manually specify skipped layers
 skip_modules: []              # manually specify skipped modules, all layers with this tag would be skipped
 special_layers:               # manually specify layers
     layers_list: [

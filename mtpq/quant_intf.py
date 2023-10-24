@@ -7,6 +7,7 @@ from mtpq.tensor_quant import QuantDescriptor
 from mtpq.quant_utils import set_module
 from mtpq.quant_fx import insert_qdq_nodes_via_subgraph_match
 from mtpq.nn.modules.converter import *
+from mtpq.utils.layer_reconstruction import layer_rebuild, save_inp_oup_data
 
 
 _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
@@ -55,6 +56,12 @@ _DEFAULT_DE_QUANT_MAP = {
                       "QuantAdaptiveAvgPool1d": nn.AdaptiveAvgPool1d,
                       "QuantAdaptiveAvgPool2d": nn.AdaptiveAvgPool2d,
                       "QuantAdaptiveAvgPool3d": nn.AdaptiveAvgPool3d}
+
+_DEFAULT_FUSE_PATTERN_MAP = {
+                      "Conv2d": "Conv2dBNFuse",}
+_ADAROUND_FUSE_PATTERN_MAP ={
+                    "Conv2d" : "Conv2dBNFuseInPlace"
+}
 
 def parse_config(config_file):
     with open(config_file) as f:
@@ -134,15 +141,16 @@ def save_hist(model, save_to=None):
 def get_quant_desc(config):
     quant_desc = {
         "input_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,
-                                                 quantizer_type=config.a_qscheme.quantizer_type,
+                                                 quantizer_type=config.a_qscheme.quantizer_type,symmetry = config.a_qscheme.symmetry,
                                                  unsigned=config.a_qscheme.unsigned if hasattr(config.a_qscheme, 'unsigned') else False),
         "conv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(0) if config.w_qscheme.per_channel is True else None,
-                                            calib_method=config.w_qscheme.calib_method,
-                                            quantizer_type=config.w_qscheme.quantizer_type),
+                                            calib_method=config.w_qscheme.calib_method,symmetry = config.a_qscheme.symmetry,
+                                            quantizer_type=config.w_qscheme.quantizer_type,
+                                            unsigned=config.w_qscheme.unsigned if hasattr(config.w_qscheme, 'unsigned') else False),
         "deconv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(1) if config.w_qscheme.per_channel is True else None,
-                                              calib_method=config.w_qscheme.calib_method,
+                                              calib_method=config.w_qscheme.calib_method,symmetry = config.a_qscheme.symmetry,
                                               quantizer_type=config.w_qscheme.quantizer_type),
-        "output_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,
+        "output_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,symmetry = config.a_qscheme.symmetry,
                                       quantizer_type=config.a_qscheme.quantizer_type),
     }
     return EasyDict(quant_desc)
@@ -181,6 +189,30 @@ def custom_ops_replace(model, config, custom_module_map=_CUSTOM_MAP['CNN']):
 
     return model
 
+def fuse_pattern_replace(model, config, custom_module_map=_DEFAULT_FUSE_PATTERN_MAP):
+    quant_desc = get_quant_desc(config)
+    if config.w_qscheme.quantizer_type == "adaround":
+        custom_module_map = _ADAROUND_FUSE_PATTERN_MAP
+        
+    for k, m in model.named_modules():
+        if skip_layers_check(k, config):
+            print("Skip Layer {}".format(k))
+            continue
+        module_type = m.__class__.__name__
+        if module_type in custom_module_map.keys():
+            converter = globals()['{}Converter'.format(custom_module_map[module_type])](quant_desc)
+            set_module(model, k, converter.convert(m))
+
+    for k, m in model.named_modules():
+        if isinstance(m, nn.BatchNorm2d) and hasattr(m, 'following_bn') and m.following_bn:
+            if hasattr(m,"act"):## FIXME This is just for quick application in SNPE, just suit for EfficientNet 
+                act_layer = m.act
+                set_module(model, k, act_layer)
+            else:
+                set_module(model, k, nn.Identity())
+
+    return model
+
 def get_quant_module_map(quant_layers_type=[]):
     if len(quant_layers_type) == 0:
         return _DEFAULT_QUANT_MAP
@@ -190,6 +222,25 @@ def get_quant_module_map(quant_layers_type=[]):
 
 def get_custom_module_map(type_str):
     return _CUSTOM_MAP[type_str]
+
+def find_conv_bn_patterns(module):
+    named_children = module.named_children()
+    for name, child in named_children:
+        if isinstance(child, nn.Conv2d):
+            try:
+                next_name, next_child = next(named_children)
+            except:
+                next_child = None
+            if isinstance(next_child, nn.BatchNorm2d):
+                setattr(child, 'is_bn_following', True)
+                setattr(next_child, 'following_bn', True)
+                follow_bn = {'bn_name': next_name,
+                             'bn_module': next_child}
+                setattr(child, 'follow_bn', follow_bn)
+            else:
+                setattr(child, 'is_bn_following', False)
+        else:
+            find_conv_bn_patterns(child)
 
 
 def quant_insert_qdq(model, config, type_str='CNN', do_trace=True):
@@ -278,6 +329,33 @@ def quant_model_calib_bert(model, data_loader, config, batch_size, predict):
         collect_stats(model, data_loader, calib_batch, predict)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
+def quant_model_calib_adaround(model, data_loader, config, batch_size, predict):
+    model.eval()
+    model.cuda()
+    #weight caibration: layer reconstruction
+    cali_data, _ = get_train_samples(data_loader, num_samples=1024)
+    recon_model(model,cali_data, batch_size,model)
+            
+    #activation caibration
+    calib_num = min(config.calib_data_nums, len(data_loader.dataset)) if hasattr(data_loader, 'dataset') else config.calib_data_nums
+    calib_batch = calib_num // batch_size
+    with torch.no_grad():
+        collect_stats(model, data_loader, calib_batch, predict)
+        compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
+
+def recon_model(model,cali_data, batch_size,ori_model):
+    """
+    Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
+    """
+    for name, module in model.named_children():
+        if isinstance(module,(quant_nn.Conv2d, quant_nn.Conv2dBNFuseInPlace, quant_nn.Linear, quant_nn.LinearFT)):
+            # compute_amax(model)
+            print('Reconstruction for layer {}'.format(name))
+            cached_inps, cached_outs = save_inp_oup_data(ori_model, module, cali_data, batch_size, keep_gpu=True)
+            layer_rebuild(module, cached_inps, cached_outs,batch_size=batch_size,warmup=0.1)
+        else:
+            recon_model(module, cali_data, batch_size,ori_model)
+
 def quant_model_export(model, onnx_path, data_shape, dynamic_axes=None):
     model.eval()
     model.cuda()
@@ -292,3 +370,13 @@ def quant_model_export(model, onnx_path, data_shape, dynamic_axes=None):
                       do_constant_folding=True,
                       operator_export_type=torch.onnx.OperatorExportTypes.ONNX,
                       dynamic_axes=dynamic_axes)
+
+
+def get_train_samples(train_loader, num_samples):
+    train_data, target = [], []
+    for batch in train_loader:
+        train_data.append(batch[0])
+        target.append(batch[1])
+        if len(train_data) * batch[0].size(0) >= num_samples:
+            break
+    return torch.cat(train_data, dim=0)[:num_samples], torch.cat(target, dim=0)[:num_samples]
