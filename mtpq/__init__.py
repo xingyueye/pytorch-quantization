@@ -18,4 +18,5 @@
 
 from absl import logging
 from .version import __version__
+from .quant_intf import parse_config, save_hist
 logging.use_absl_handler()

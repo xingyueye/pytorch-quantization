@@ -14,21 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-
-from mtpq.nn.quantizer.tensor_quantizer import *
-from mtpq.nn.quantizer.tensor_lsq_quantizer import *
-from mtpq.nn.quantizer.tensor_stable_lsq_quantizer import *
-from mtpq.nn.quantizer.tensor_lsq_plus_quantizer import *
-
-from mtpq.nn.modules.quant_conv import *
-from mtpq.nn.modules.quant_linear import *
-from mtpq.nn.modules.quant_linear_ft import *
-from mtpq.nn.modules.quant_pooling import *
-from mtpq.nn.modules.clip import *
-from mtpq.nn.modules.quant_rnn import *
-from mtpq.nn.modules.quant_instancenorm import *
-from mtpq.nn.modules.quant_transformer import *
-from mtpq.nn.modules.quant_mha import *
-
-from mtpq.nn.modules.layers import *
+__version__ = "0.1.0-rc"

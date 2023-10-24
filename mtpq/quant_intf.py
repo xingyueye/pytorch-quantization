@@ -115,6 +115,20 @@ def compute_amax(model, **kwargs):
                 module.load_calib_amax(**kwargs)
             print(F"{name:40}: {module}")
     model.cuda()
+    
+def save_hist(model, save_to=None):
+    hist_dict = {}
+    for name, module in model.named_modules():
+        if isinstance(module, quant_nn.TensorQuantizer):
+            if module._calibrator is not None:
+                hist_dict[name] = {
+                    'hist': module._calibrator._calib_hist if hasattr(module._calibrator, '_calib_hist') else None,
+                    'bin_edges': module._calibrator._calib_bin_edges if hasattr(module._calibrator, '_calib_bin_edges') else None,
+                    'amax': module.amax
+                }
+    if save_to is not None and type(save_to) is str:
+        torch.save(hist_dict, save_to)
+    return hist_dict      
 
 
 def get_quant_desc(config):
@@ -251,7 +265,7 @@ def quant_model_calib_timm(model, data_loader, config, batch_size, predict):
     calib_batch = calib_num // batch_size
     with torch.no_grad():
         collect_stats(model, data_loader, calib_batch, predict)
-        compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
+        compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile,strict=False)
 
 def quant_model_calib_bert(model, data_loader, config, batch_size, predict):
     model.eval()
