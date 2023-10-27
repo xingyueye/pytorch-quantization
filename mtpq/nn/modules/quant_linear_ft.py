@@ -7,7 +7,7 @@ from mtpq import tensor_quant
 
 from . import _utils
 
-__all__ = ["QuantLinearFT"]
+__all__ = ["LinearFT", "QuantLinearFT"]
 
 class QuantLinearFT(nn.Linear, _utils.QuantGemmMixin):
     """FasterTransformer Quantized version of nn.Linear

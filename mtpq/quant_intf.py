@@ -1,14 +1,15 @@
-import yaml
-from easydict import EasyDict
 from tqdm import tqdm
+from easydict import EasyDict
 
+from mtpq import nn as quant_nn
 # from mtpq import calib
 from mtpq.tensor_quant import QuantDescriptor
 from mtpq.quant_utils import set_module
 from mtpq.quant_fx import insert_qdq_nodes_via_subgraph_match
 from mtpq.nn.modules.converter import *
-from mtpq.utils.layer_reconstruction import layer_rebuild, save_inp_oup_data
-
+# from mtpq.utils.layer_reconstruction import layer_rebuild, save_inp_oup_data
+from mtpq.utils.layer_reconstruction import layer_rebuild, cache_layer_blobs
+from mtpq.utils.calib_utils import *
 
 _DEFAULT_QUANT_MAP = {"Conv1d": quant_nn.QuantConv1d,
                       "Conv2d": quant_nn.QuantConv2d,
@@ -62,80 +63,6 @@ _DEFAULT_FUSE_PATTERN_MAP = {
 _ADAROUND_FUSE_PATTERN_MAP ={
                     "Conv2d" : "Conv2dBNFuseInPlace"
 }
-
-def parse_config(config_file):
-    with open(config_file) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    return EasyDict(config)
-
-
-def enable_calibration(model):
-    """Enable calibration of all *_input_quantizer modules in model."""
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                module.disable_quant()
-                module.enable_calib()
-            else:
-                module.disable()
-
-
-def disable_calibration(model):
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                module.enable_quant()
-                module.disable_calib()
-            else:
-                module.enable()
-
-
-def _internal_predict(model, data_loader, num_batches):
-    for i, (image, _) in tqdm(enumerate(data_loader), total=num_batches):
-        # image = image.float()/255.0
-        model(image.cuda())
-        if i >= num_batches:
-            break
-
-def collect_stats(model, data_loader, num_batches, predict):
-    """Feed data to the network and collect statistic"""
-    enable_calibration(model)
-
-    if predict is None:
-        _internal_predict(model, data_loader, num_batches)
-    else:
-        predict(model, data_loader, num_batches)
-
-    disable_calibration(model)
-
-
-def compute_amax(model, **kwargs):
-    # Load Calib result
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                # #MinMaxCalib
-                # if isinstance(module._calibrator, calib.MaxCalibrator):
-                #     module.load_calib_amax()
-                # else:
-                # #HistogramCalib
-                module.load_calib_amax(**kwargs)
-            print(F"{name:40}: {module}")
-    model.cuda()
-    
-def save_hist(model, save_to=None):
-    hist_dict = {}
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                hist_dict[name] = {
-                    'hist': module._calibrator._calib_hist if hasattr(module._calibrator, '_calib_hist') else None,
-                    'bin_edges': module._calibrator._calib_bin_edges if hasattr(module._calibrator, '_calib_bin_edges') else None,
-                    'amax': module.amax
-                }
-    if save_to is not None and type(save_to) is str:
-        torch.save(hist_dict, save_to)
-    return hist_dict      
 
 
 def get_quant_desc(config):
@@ -329,32 +256,63 @@ def quant_model_calib_bert(model, data_loader, config, batch_size, predict):
         collect_stats(model, data_loader, calib_batch, predict)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
-def quant_model_calib_adaround(model, data_loader, config, batch_size, predict):
+def quant_model_calib_adaround(model, data_loader, config, batch_size, predict, batch_first=True, qdrop_prob=0.5, use_bc=False):
     model.eval()
     model.cuda()
-    #weight caibration: layer reconstruction
-    cali_data, _ = get_train_samples(data_loader, num_samples=1024)
-    recon_model(model,cali_data, batch_size,model)
-            
-    #activation caibration
     calib_num = min(config.calib_data_nums, len(data_loader.dataset)) if hasattr(data_loader, 'dataset') else config.calib_data_nums
     calib_batch = calib_num // batch_size
+    print(f'adaround: before layer reconstruction: batch first: {batch_first}, \
+          calib num: {calib_num}({config.calib_data_nums}, {len(data_loader.dataset)}), \
+              batches num: {calib_batch}, qdrop prob: {qdrop_prob}, usebc: {use_bc}')
+    #activation caibration
+    # with torch.no_grad():
+    #     collect_stats(model, data_loader, calib_batch, predict)
+    #     compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
+    
+    print('adaround: layer reconstruction begin')
+    #weight caibration: layer reconstruction
+    # cali_data, _ = get_train_samples(data_loader, num_samples=1024)
+    # recon_model(model,cali_data, batch_size,model)
+    reconstruct_model(model, data_loader, batch_size, model, predict, calib_batch, batch_first=batch_first, qdrop_prob=qdrop_prob, use_bc=use_bc)
+    print('adaround: layer reconstruction done')
+
+    #activation caibration
     with torch.no_grad():
         collect_stats(model, data_loader, calib_batch, predict)
         compute_amax(model, method=config.a_qscheme.hist_method, percentile=config.a_qscheme.percentile)
 
-def recon_model(model,cali_data, batch_size,ori_model):
+def reconstruct_model(model, data_loader, batch_size, ori_model, predict_func, calib_batch, 
+                      batch_first=True, name_prefix='', qdrop_prob=0.5, use_bc=False):
     """
     Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
     """
     for name, module in model.named_children():
         if isinstance(module,(quant_nn.Conv2d, quant_nn.Conv2dBNFuseInPlace, quant_nn.Linear, quant_nn.LinearFT)):
             # compute_amax(model)
-            print('Reconstruction for layer {}'.format(name))
-            cached_inps, cached_outs = save_inp_oup_data(ori_model, module, cali_data, batch_size, keep_gpu=True)
-            layer_rebuild(module, cached_inps, cached_outs,batch_size=batch_size,warmup=0.1)
+            print(f'adaround: Reconstruction for layer {name_prefix}.{name}')
+            # cached_inps, cached_outs = save_inp_oup_data(ori_model, module, cali_data, batch_size, keep_gpu=True)
+            # layer_rebuild(module, cached_inps, cached_outs, batch_size=batch_size, warmup=0.1)
+            
+            cached_inputs, cached_outputs = cache_layer_blobs(ori_model, module, predict_func, data_loader, batch_size, calib_batch, 
+                                                              batch_first=batch_first, qdrop_prob=qdrop_prob)
+            layer_rebuild(module, cached_inputs, cached_outputs, 
+                          batch_size=batch_size, warmup=0.1, iters=30000, qdrop_prob=qdrop_prob, use_bc=use_bc)
         else:
-            recon_model(module, cali_data, batch_size,ori_model)
+            reconstruct_model(module, data_loader, batch_size, ori_model, predict_func, calib_batch, 
+                              batch_first=batch_first, name_prefix=f'{name_prefix}.{name}',qdrop_prob=qdrop_prob, use_bc=use_bc)
+
+# def recon_model(model,cali_data, batch_size,ori_model):
+#     """
+#     Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
+#     """
+#     for name, module in model.named_children():
+#         if isinstance(module,(quant_nn.Conv2d, quant_nn.Conv2dBNFuseInPlace, quant_nn.Linear, quant_nn.LinearFT)):
+#             # compute_amax(model)
+#             print('Reconstruction for layer {}'.format(name))
+#             cached_inps, cached_outs = save_inp_oup_data(ori_model, module, cali_data, batch_size, keep_gpu=True)
+#             layer_rebuild(module, cached_inps, cached_outs,batch_size=batch_size,warmup=0.1)
+#         else:
+#             recon_model(module, cali_data, batch_size,ori_model)
 
 def quant_model_export(model, onnx_path, data_shape, dynamic_axes=None):
     model.eval()

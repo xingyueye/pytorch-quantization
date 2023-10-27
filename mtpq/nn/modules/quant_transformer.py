@@ -7,6 +7,7 @@ import copy
 from torch import nn
 from torch.nn import functional as F
 
+from mtpq.utils.config_utils import parse_config
 from mtpq import tensor_quant, quant_intf
 from mtpq.nn import TensorQuantizer
 from mtpq.nn.modules.quant_linear_ft import *
@@ -39,7 +40,7 @@ def construct_quant_transformer_encoder(d_model, nhead, num_layers,
     if quant_config is not None:
         assert type(quant_config) is str, f"quant_config provided for construct_quant_transformer_encoder should be str(path of yaml file)"
         print(f'spec quant config from: {quant_config}')
-        quant_config = quant_intf.parse_config(quant_config)
+        quant_config = parse_config(quant_config)
         quant_config.w_qscheme.per_channel = weight_per_channel
         quant_desc = quant_intf.get_quant_desc(quant_config)
         if 'input_desc' in quant_desc:

@@ -147,6 +147,8 @@ class AdaRoundQuantizer(TensorQuantizer_asym):
         return torch.clamp(torch.sigmoid(self.alpha) * (self.zeta - self.gamma) + self.gamma, 0, 1)
 
     def init_alpha(self, x: torch.Tensor):
+        if self.delta is None:
+            self.delta, self.zero_point = self.calculate_qparams(self.amin,self.amax)
         x_floor = torch.floor(x / self.delta)
         print('Init alpha to be FP32')
         rest = (x / self.delta) - x_floor

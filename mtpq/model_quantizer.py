@@ -11,7 +11,7 @@ from mtpq.quant_intf import *
 from mtpq.quant_partial import top1_sensitivity, fast_sensitivity, do_partial_quant
 from mtpq.quant_utils import model_quant_enable, model_quant_disable, set_quantizer_by_name
 from mtpq.utils.onnx_utils import remove_qdq_nodes_from_qat_onnx,remove_qdq_nodes_from_onnx_ada
-
+from mtpq.utils.config_utils import parse_config
 
 class ModelQuantizer:
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
@@ -75,13 +75,13 @@ class ModelQuantizer:
 class AdaRoundModelQuantizer(ModelQuantizer):
     def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
         super(AdaRoundModelQuantizer,self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
-        
+                
     def _forward_step(self, images):
         with torch.no_grad():
             _ = self.model(images.to(next(self.model.parameters()).device))
             
-    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
-        quant_model_calib_adaround(self.model, data_loader, self.quant_config, batch_size, custom_predict)
+    def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None, batch_first=True):
+        quant_model_calib_adaround(self.model, data_loader, self.quant_config, batch_size, custom_predict, batch_first=batch_first)
         if save_calib_model:
             self._save_calib_weights()
 

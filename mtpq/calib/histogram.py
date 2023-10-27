@@ -48,7 +48,7 @@ class HistogramCalibrator(_Calibrator):
         torch_hist: A boolean. If True, collect histogram by torch.histc instead of np.histogram. If input tensor
             is on GPU, histc will also be running on GPU. Default False.
     """
-    def __init__(self, num_bits, axis, unsigned, num_bins=2048, grow_method=None, skip_zeros=False, torch_hist=False):
+    def __init__(self, num_bits, axis, unsigned, num_bins=2048, grow_method=None, skip_zeros=False, torch_hist=True):
         super(HistogramCalibrator, self).__init__(num_bits, axis, unsigned)
         self._num_bins = num_bins
         self._skip_zeros = skip_zeros

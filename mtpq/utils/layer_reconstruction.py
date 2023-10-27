@@ -1,139 +1,55 @@
 import torch
 from mtpq import nn as quant_nn
+from mtpq.utils.calib_utils import collect_stats
 
-class LinearTempDecay:
-    def __init__(self, t_max: int, rel_start_decay: float = 0.2, start_b: int = 10, end_b: int = 2):
-        self.t_max = t_max
-        self.start_decay = rel_start_decay * t_max
-        self.start_b = start_b
-        self.end_b = end_b
-
-    def __call__(self, t):
-        """
-        Cosine annealing scheduler for temperature b.
-        :param t: the current time step
-        :return: scheduled temperature
-        """
-        if t < self.start_decay:
-            return self.start_b
-        else:
-            rel_t = (t - self.start_decay) / (self.t_max - self.start_decay)
-            return self.end_b + (self.start_b - self.end_b) * max(0.0, (1 - rel_t))
-
-class StopForwardException(Exception):
-    """
-    Used to throw and catch an exception to stop traversing the graph
-    """
-    pass
-
-class DataSaverHook:
-    """
-    Forward hook that stores the input and output of a block
-    """
-
-    def __init__(self, store_input=False, store_output=False, stop_forward=False):
-        self.store_input = store_input
-        self.store_output = store_output
-        self.stop_forward = stop_forward
-
-        self.input_store = None
-        self.output_store = None
-
-    def __call__(self, module, input_batch, output_batch):
-        if self.store_input:
-            self.input_store = input_batch
-        if self.store_output:
-            self.output_store = output_batch
-        if self.stop_forward:
-            raise StopForwardException
-
-class GetLayerInpOut:
-    def __init__(self, model, layer, device: torch.device):
-        self.model = model
-        self.layer = layer
-        self.device = device
-        self.data_saver = DataSaverHook(store_input=True, store_output=True, stop_forward=True)
-
-    def __call__(self, model_input):
-        disable_model_quant(self.model)
-        handle = self.layer.register_forward_hook(self.data_saver)
-        with torch.no_grad():
-            try:
-                _ = self.model(model_input.to(self.device))
-            except StopForwardException:
-                pass
-            # Recalculate input with network quantized
-            self.data_saver.store_output = False
-            enable_model_quant(self.model)
-            try:
-                _ = self.model(model_input.to(self.device))
-            except StopForwardException:
-                pass
-
-            self.data_saver.store_output = True
-        handle.remove()
-        return self.data_saver.input_store[0].detach(), self.data_saver.output_store.detach()
-
-def disable_model_quant(model):
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                module.disable_quant()
-                module.enable_calib()
-            else:
-                module.disable()
-                
-def enable_model_quant(model):
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                module.enable_quant()
-                module.disable_calib()
-            else:
-                module.enable()
-
-def lp_loss(pred, tgt, p=2.0, reduction='none'):
-    """
-    loss function measured in L_p Norm
-    """
-    if reduction == 'none':
-        return (pred - tgt).abs().pow(p).sum(1).mean()
-    else:
-        return (pred - tgt).abs().pow(p).mean()
-
-def save_inp_oup_data(model, layer, cali_data: torch.Tensor,
-                       batch_size: int = 32, keep_gpu: bool = True):
-    """
-    Save input data and output data of a particular layer/block over calibration dataset.
-
-    :param model: QuantModel
-    :param layer: QuantModule or QuantBlock
-    :param cali_data: calibration data set
-    :param weight_quant: use weight_quant quantization
-    :param act_quant: use act_quant quantization
-    :param batch_size: mini-batch size for calibration
-    :param keep_gpu: put saved data on GPU for faster optimization
-    :return: input and output data
-    """
+def cache_layer_blobs(model, layer, pred_func, data_loader, batch_size, num_batches, batch_first=True,qdrop_prob=0.5):
     device = next(model.parameters()).device
-    get_inp_out = GetLayerInpOut(model, layer, device=device)
-    cached_batches = []
+    cached_fp32_inputs = []
+    cached_quant_inputs = []
+    cached_fp32_outputs = []
+    class DataHook:
+        def __init__(self, is_quant=False):
+            self.is_quant = is_quant
+            
+        def __call__(self, module, input_batch, output_batch):
+            if self.is_quant:
+                cached_quant_inputs.append(input_batch[0].detach())
+            else:
+                cached_fp32_inputs.append(input_batch[0].detach())
+                cached_fp32_outputs.append(output_batch.detach())
 
-    for i in range(int(cali_data.size(0) / batch_size)):
-        cur_inp, cur_out= get_inp_out(cali_data[i * batch_size:(i + 1) * batch_size])
-        cached_batches.append((cur_inp.cpu(), cur_out.cpu(), cur_sym.cpu()))
-    cached_inps = torch.cat([x[0] for x in cached_batches])
-    cached_outs = torch.cat([x[1] for x in cached_batches])
+    data_saver = DataHook(is_quant=False)
+    handle = layer.register_forward_hook(data_saver)
+    collect_stats(model, data_loader, num_batches, pred_func)
+    handle.remove()
+
+    # print(f'inside cache_layer_blobs, collect layer {layer.__class__.__name__} inputs: {len(cache_inputs)}, outputs: {len(cache_outputs)}')
+    
+    data_saver = DataHook(is_quant=True)
+    handle = layer.register_forward_hook(data_saver)
+    pred_func(model, data_loader, num_batches)
+    handle.remove()
+    # print(f'inside cache_layer_blobs, collect layer {layer.__class__.__name__} inputs: {len(cache_inputs)}, outputs: {len(cache_outputs)}')
+    collect_dim = 1 if batch_first else 0
+    final_inputs = torch.cat([item for item in cached_quant_inputs], dim=collect_dim)
+    if qdrop_prob < 1.0:
+        final_inputs = (final_inputs, torch.cat([item for item in cached_fp32_inputs], dim=collect_dim))
+    final_outputs = torch.cat([item for item in cached_fp32_outputs], dim=collect_dim)
+    if not batch_first:
+        final_inputs = final_inputs.transpose(0,1) if isinstance(final_inputs, torch.Tensor) else (final_inputs[0].transpose(0,1), final_inputs[1].transpose(0,1))
+        final_outputs = final_outputs.transpose(0,1)
     torch.cuda.empty_cache()
-    if keep_gpu:
-        cached_inps = cached_inps.to(device)
-        cached_outs = cached_outs.to(device)
-    return cached_inps, cached_outs
+    
+    # print(f'after cache_layer_blobs, collect layer {layer.__class__.__name__} inputs: {final_inputs.shape}, outputs: {final_outputs.shape}')
+    # exit(-1)
+    return final_inputs, final_outputs
 
 def layer_rebuild(layer, cached_inps, cached_outs, 
                          batch_size: int = 32, iters: int = 20000, weight: float = 0.001, opt_mode: str = 'mse',
                          act_quant: bool = False, b_range: tuple = (20, 2),
-                         warmup: float = 0.0, p: float = 2.0, lr: float = 4e-5, keep_gpu: bool = True):
+                         warmup: float = 0.0, p: float = 2.0, lr: float = 4e-5, keep_gpu: bool = True, 
+                         qdrop_prob=0.5,
+                         use_bc = False):
     """
     Block reconstruction to optimize the output from each layer.
 
@@ -167,11 +83,37 @@ def layer_rebuild(layer, cached_inps, cached_outs,
                              max_count=iters, rec_loss=rec_loss, b_range=b_range,
                              decay_start=0, warmup=warmup, p=p)
     device = 'cuda'
-    sz = cached_inps[0].size(0)
+    if qdrop_prob < 1.0:
+        sz = cached_inps[0][0].size(0)
+        quant_inps = cached_inps[0]
+        fp32_inps = cached_inps[1]
+    else:
+        sz = cached_inps[0].size(0)
+        quant_inps = cached_inps
+    # expand_shape = cached_inps.size(0), -1, cached_inps.size(-1)
+    print(f'layer_rebuild: generate idx src: {sz}, {batch_size}, cached inputs: {quant_inps.shape}, outputs: {cached_outs.shape}')
+    if use_bc:
+        with torch.no_grad():
+            quant_outps = layer(quant_inps)
+            err_item = cached_outs - quant_outps
+            err_expect = err_item.flatten(start_dim=0, end_dim=-2).mean(dim=0)
+            new_bias = torch.zeros(layer.weight.shape[0]).to(device)
+            if hasattr(layer, 'bias'):
+                new_bias = layer.bias.detach()
+            new_bias+= err_expect
+            layer.bias = torch.nn.Parameter(new_bias)
+            # print(f'show bc: err item: {err_item.shape}, bias: {layer.bias.shape}')
+        return
+    
     for i in range(iters):
-        idx = torch.randint(0, sz, (batch_size,))
-        cur_inp= cached_inps[idx].to(device)
-        cur_out = cached_outs[idx].to(device)
+        idx = torch.randint(0, sz, (batch_size,)).to(device)
+        # print(f'iter {i}, generate idx: {idx}, cache inputs: {cached_inps.shape}, outputs: {cached_outs.shape}')
+        # cur_inp = cached_inps[idx].to(device)
+        # cur_out = cached_outs[idx].to(device)
+        cur_quant_inp = quant_inps[range(len(idx)), idx].to(device)
+        cur_fp32_inp = fp32_inps[range(len(idx)), idx].to(device)
+        cur_inp = torch.where(torch.rand_like(cur_quant_inp) < qdrop_prob, cur_quant_inp, cur_fp32_inp)
+        cur_out = cached_outs[range(len(idx)), idx].to(device)
 
         w_opt.zero_grad()
         out_quant = layer(cur_inp)
@@ -243,7 +185,118 @@ class LossFunction:
             raise NotImplementedError
 
         total_loss = rec_loss + round_loss
-        if self.count % 500 == 0:
+        if self.count % 1000 == 0:
             print('Total loss:\t{:.3f} (rec:{:.3f}, round:{:.3f})\tb={:.2f}\tcount={}'.format(
                 float(total_loss), float(rec_loss), float(round_loss), b, self.count))
         return total_loss
+
+def lp_loss(pred, tgt, p=2.0, reduction='none'):
+    """
+    loss function measured in L_p Norm
+    """
+    if reduction == 'none':
+        return (pred - tgt).abs().pow(p).sum(1).mean()
+    else:
+        return (pred - tgt).abs().pow(p).mean()
+
+class LinearTempDecay:
+    def __init__(self, t_max: int, rel_start_decay: float = 0.2, start_b: int = 10, end_b: int = 2):
+        self.t_max = t_max
+        self.start_decay = rel_start_decay * t_max
+        self.start_b = start_b
+        self.end_b = end_b
+
+    def __call__(self, t):
+        """
+        Cosine annealing scheduler for temperature b.
+        :param t: the current time step
+        :return: scheduled temperature
+        """
+        if t < self.start_decay:
+            return self.start_b
+        else:
+            rel_t = (t - self.start_decay) / (self.t_max - self.start_decay)
+            return self.end_b + (self.start_b - self.end_b) * max(0.0, (1 - rel_t))
+
+
+# def save_inp_oup_data(model, layer, cali_data: torch.Tensor,
+#                        batch_size: int = 32, keep_gpu: bool = True):
+#     """
+#     Save input data and output data of a particular layer/block over calibration dataset.
+
+#     :param model: QuantModel
+#     :param layer: QuantModule or QuantBlock
+#     :param cali_data: calibration data set
+#     :param weight_quant: use weight_quant quantization
+#     :param act_quant: use act_quant quantization
+#     :param batch_size: mini-batch size for calibration
+#     :param keep_gpu: put saved data on GPU for faster optimization
+#     :return: input and output data
+#     """
+#     device = next(model.parameters()).device
+#     get_inp_out = GetLayerInpOut(model, layer, device=device)
+#     cached_batches = []
+
+#     for i in range(int(cali_data.size(0) / batch_size)):
+#         cur_inp, cur_out= get_inp_out(cali_data[i * batch_size:(i + 1) * batch_size])
+#         cached_batches.append((cur_inp.cpu(), cur_out.cpu(), cur_sym.cpu()))
+#     cached_inps = torch.cat([x[0] for x in cached_batches])
+#     cached_outs = torch.cat([x[1] for x in cached_batches])
+#     torch.cuda.empty_cache()
+#     if keep_gpu:
+#         cached_inps = cached_inps.to(device)
+#         cached_outs = cached_outs.to(device)
+#     return cached_inps, cached_outs
+# class GetLayerInpOut:
+#     def __init__(self, model, layer, device: torch.device):
+#         self.model = model
+#         self.layer = layer
+#         self.device = device
+#         self.data_saver = DataSaverHook(store_input=True, store_output=True, stop_forward=True)
+
+#     def __call__(self, model_input):
+#         disable_model_quant(self.model)
+#         handle = self.layer.register_forward_hook(self.data_saver)
+#         with torch.no_grad():
+#             try:
+#                 _ = self.model(model_input.to(self.device))
+#             except StopForwardException:
+#                 pass
+#             # Recalculate input with network quantized
+#             self.data_saver.store_output = False
+#             enable_model_quant(self.model)
+#             try:
+#                 _ = self.model(model_input.to(self.device))
+#             except StopForwardException:
+#                 pass
+
+#             self.data_saver.store_output = True
+#         handle.remove()
+#         return self.data_saver.input_store[0].detach(), self.data_saver.output_store.detach()
+
+# class StopForwardException(Exception):
+#     """
+#     Used to throw and catch an exception to stop traversing the graph
+#     """
+#     pass
+
+# class DataSaverHook:
+#     """
+#     Forward hook that stores the input and output of a block
+#     """
+
+#     def __init__(self, store_input=False, store_output=False, stop_forward=False):
+#         self.store_input = store_input
+#         self.store_output = store_output
+#         self.stop_forward = stop_forward
+
+#         self.input_store = None
+#         self.output_store = None
+
+#     def __call__(self, module, input_batch, output_batch):
+#         if self.store_input:
+#             self.input_store = input_batch
+#         if self.store_output:
+#             self.output_store = output_batch
+#         if self.stop_forward:
+#             raise StopForwardException
