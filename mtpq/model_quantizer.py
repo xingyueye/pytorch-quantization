@@ -14,14 +14,23 @@ from mtpq.utils.onnx_utils import remove_qdq_nodes_from_qat_onnx,remove_qdq_node
 from mtpq.utils.config_utils import parse_config
 
 class ModelQuantizer:
-    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False, calib_save_root='./'):
         self.quant_config = parse_config(config)
         if save_ori_model:
             self.ori_model = copy.deepcopy(model)
         self.calib_weights = calib_weights
         self.model_name = model_name
+        self.calib_save_root = calib_save_root
         self.device = next(model.parameters()).device
         self.model = self._quant_model_init(model, self.quant_config, self.calib_weights).to(self.device)
+        if not self.calib_weights:
+            self.calib_weights = "{}_calib_{}_w{}a{}_{}.pt".format(self.model_name,
+                                                          self.quant_config.calib_data_nums,
+                                                          self.quant_config.w_qscheme.bit,
+                                                          self.quant_config.a_qscheme.bit,
+                                                          self.quant_config.a_qscheme.quantizer_type)
+            self.calib_weights = os.path.join(self.calib_save_root, self.calib_weights)
+            
 
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init(model, config, calib_weights, type_str='CNN', do_trace=True)
@@ -39,12 +48,6 @@ class ModelQuantizer:
             self._save_calib_weights()
 
     def _save_calib_weights(self):
-        if not self.calib_weights:
-            self.calib_weights = "{}_calib_{}_w{}a{}_{}.pt".format(self.model_name,
-                                                          self.quant_config.calib_data_nums,
-                                                          self.quant_config.w_qscheme.bit,
-                                                          self.quant_config.a_qscheme.bit,
-                                                          self.quant_config.a_qscheme.quantizer_type)
         save_calib_model(self.calib_weights, self.model)
 
     def partial_quant(self, eval_loader, eval_func, mini_eval_loader=None):
@@ -73,8 +76,9 @@ class ModelQuantizer:
         remove_qdq_nodes_from_qat_onnx(onnx_path)
 
 class AdaRoundModelQuantizer(ModelQuantizer):
-    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(AdaRoundModelQuantizer,self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False, calib_save_root='./'):
+        super(AdaRoundModelQuantizer,self).__init__(model_name, model, config, 
+                                                    calib_weights=calib_weights, save_ori_model=save_ori_model, calib_save_root=calib_save_root)
                 
     def _forward_step(self, images):
         with torch.no_grad():
@@ -94,8 +98,9 @@ class AdaRoundModelQuantizer(ModelQuantizer):
         remove_qdq_nodes_from_onnx_ada(onnx_path,'SNPE',unsigned_flag)
 
 class TimmModelQuantizer(ModelQuantizer):
-    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(TimmModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False, calib_save_root='./'):
+        super(TimmModelQuantizer, self).__init__(model_name, model, config, 
+                                                 calib_weights=calib_weights, save_ori_model=save_ori_model, calib_save_root=calib_save_root)
 
 
     def calibration(self, data_loader, batch_size, save_calib_model=False, custom_predict=None):
@@ -141,8 +146,9 @@ class TimmModelQuantizer(ModelQuantizer):
 
 
 class MMClsModelQuantizer(ModelQuantizer):
-    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(MMClsModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False, calib_save_root='./'):
+        super(MMClsModelQuantizer, self).__init__(model_name, model, config, 
+                                                  calib_weights=calib_weights, save_ori_model=save_ori_model, calib_save_root=calib_save_root)
 
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init_mmlab(model, config, calib_weights)
@@ -237,8 +243,9 @@ class MMClsModelQuantizer(ModelQuantizer):
                         pbar.update(1)
 
 class MMSegModelQuantizer(ModelQuantizer):
-    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(MMSegModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False, calib_save_root='./'):
+        super(MMSegModelQuantizer, self).__init__(model_name, model, config, 
+                                                  calib_weights=calib_weights, save_ori_model=save_ori_model, calib_save_root=calib_save_root)
 
     def _quant_model_init(self, model, config, calib_weights):
         return quant_model_init_mmlab(model, config, calib_weights)
@@ -333,8 +340,9 @@ class MMSegModelQuantizer(ModelQuantizer):
                         pbar.update(1)
 
 class BERTModelQuantizer(ModelQuantizer):
-    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(BERTModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False, calib_save_root='./'):
+        super(BERTModelQuantizer, self).__init__(model_name, model, config, 
+                                                 calib_weights=calib_weights, save_ori_model=save_ori_model, calib_save_root=calib_save_root)
 
     def _quant_model_init(self, model, config, calib_weights):
         from transformers.utils.fx import symbolic_trace
@@ -348,9 +356,17 @@ class BERTModelQuantizer(ModelQuantizer):
             self._save_calib_weights()
 
 class FTSWINModelQuantizer(ModelQuantizer):
-    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False):
-        super(FTSWINModelQuantizer, self).__init__(model_name, model, config, calib_weights=calib_weights, save_ori_model=save_ori_model)
-
+    def __init__(self, model_name, model, config, calib_weights='', save_ori_model=False, calib_save_root='./'):
+        super(FTSWINModelQuantizer, self).__init__(model_name, model, config, 
+                                                   calib_weights=calib_weights, save_ori_model=save_ori_model, calib_save_root=calib_save_root)
+        if not self.calib_weights:
+            self.calib_weights = "{}_calib_{}_w{}a{}_{}.pth.tar".format(self.model_name,
+                                                          self.quant_config.calib_data_nums,
+                                                          self.quant_config.w_qscheme.bit,
+                                                          self.quant_config.a_qscheme.bit,
+                                                          self.quant_config.a_qscheme.quantizer_type)
+            self.calib_weights = os.path.join(self.calib_save_root, self.calib_weights)
+            
     def _quant_model_init(self, model, config, calib_weights):
         self.swin_buffer = dict()
         # record buffer from origin model, because we will lose buffer name after torch.fx trace
@@ -366,12 +382,6 @@ class FTSWINModelQuantizer(ModelQuantizer):
             self._save_calib_weights()
 
     def _save_calib_weights(self):
-        if not self.calib_weights:
-            self.calib_weights = "{}_calib_{}_w{}a{}_{}.pth.tar".format(self.model_name,
-                                                          self.quant_config.calib_data_nums,
-                                                          self.quant_config.w_qscheme.bit,
-                                                          self.quant_config.a_qscheme.bit,
-                                                          self.quant_config.a_qscheme.quantizer_type)
         # save_calib_model(self.calib_weights, self.model)
         state_dict = self.model.state_dict()
         for name, buffer in self.swin_buffer.items():

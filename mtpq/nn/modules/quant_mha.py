@@ -168,7 +168,7 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         if self.training:
-            attention_probs = self.dropout_layer(attention_probs)
+            attention_probs = self.dropout(attention_probs)
 
         attn_output = torch.matmul(self.matmul_a_input_quantizer(attention_probs),
                                    self.matmul_v_input_quantizer(v))
