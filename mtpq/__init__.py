@@ -19,3 +19,4 @@
 from absl import logging
 from .version import __version__
 logging.use_absl_handler()
+logging.set_verbosity(logging.INFO)
