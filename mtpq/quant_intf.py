@@ -3,7 +3,8 @@ from easydict import EasyDict
 
 from mtpq import nn as quant_nn
 # from mtpq import calib
-from mtpq.tensor_quant import QuantDescriptor
+from mtpq.utils.config_utils import get_quant_desc
+
 from mtpq.quant_utils import set_module
 from mtpq.quant_fx import insert_qdq_nodes_via_subgraph_match
 from mtpq.nn.modules.converter import *
@@ -64,23 +65,6 @@ _ADAROUND_FUSE_PATTERN_MAP ={
                     "Conv2d" : "Conv2dBNFuseInPlace"
 }
 
-
-def get_quant_desc(config):
-    quant_desc = {
-        "input_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,
-                                                 quantizer_type=config.a_qscheme.quantizer_type,symmetry = config.a_qscheme.symmetry,
-                                                 unsigned=config.a_qscheme.unsigned if hasattr(config.a_qscheme, 'unsigned') else False),
-        "conv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(0) if config.w_qscheme.per_channel is True else None,
-                                            calib_method=config.w_qscheme.calib_method,symmetry = config.a_qscheme.symmetry,
-                                            quantizer_type=config.w_qscheme.quantizer_type,
-                                            unsigned=config.w_qscheme.unsigned if hasattr(config.w_qscheme, 'unsigned') else False),
-        "deconv_weight_desc": QuantDescriptor(num_bits=config.w_qscheme.bit, axis=(1) if config.w_qscheme.per_channel is True else None,
-                                              calib_method=config.w_qscheme.calib_method,symmetry = config.a_qscheme.symmetry,
-                                              quantizer_type=config.w_qscheme.quantizer_type),
-        "output_desc": QuantDescriptor(num_bits=config.a_qscheme.bit, calib_method=config.a_qscheme.calib_method,symmetry = config.a_qscheme.symmetry,
-                                      quantizer_type=config.a_qscheme.quantizer_type),
-    }
-    return EasyDict(quant_desc)
 
 def skip_layers_check(k, config):
     for skip_module in config.skip_modules:

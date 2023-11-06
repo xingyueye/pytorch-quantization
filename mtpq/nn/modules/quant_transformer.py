@@ -8,7 +8,8 @@ from torch import nn
 from torch.nn import functional as F
 
 from mtpq.utils.config_utils import parse_config
-from mtpq import tensor_quant, quant_intf
+from mtpq.utils.config_utils import get_quant_desc
+from mtpq import tensor_quant
 from mtpq.nn import TensorQuantizer
 from mtpq.nn.modules.quant_linear_ft import *
 from mtpq.nn.modules.quant_mha import *
@@ -33,7 +34,7 @@ def construct_quant_transformer_encoder(d_model, nhead, num_layers,
         print(f'use quant config from: {quant_config}, spec weight_quant_per_tensor, narrow_range from FTQuantArgs(setting by quant_mode)')
         quant_config = parse_config(quant_config)
         quant_config.w_qscheme.per_channel = not ft_quant_args.weight_quant_per_tensor
-        quant_desc = quant_intf.get_quant_desc(quant_config)
+        quant_desc = get_quant_desc(quant_config)
         if 'input_desc' in quant_desc:
             quant_desc_input = quant_desc['input_desc']
             quant_desc_input._narrow_range = ft_quant_args.narrow_range
