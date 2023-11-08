@@ -44,7 +44,7 @@ def construct_quant_transformer_encoder(d_model, nhead, num_layers,
             quant_desc_output = quant_desc['output_desc']
             
     print(f'quant config final: input: {quant_desc_input}, weight: {quant_desc_weight}, output: {quant_desc_output}')
-        
+
     q_encoder_layer = QuantTransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation, layer_norm_eps, batch_first, 
                                                    quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
     q_encoder = QuantTransformerEncoder(q_encoder_layer, num_layers=num_layers,
@@ -71,6 +71,7 @@ class QuantTransformerEncoder(nn.Module, _utils.QuantMixin):
         super(QuantTransformerEncoder, self).__init__()
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
         self.layers = nn.ModuleList([copy.deepcopy(encoder_layer) for i in range(num_layers)])
+        self.layers[0].save_tmp()
         self.final_input_quantizer = TensorQuantizer(quant_desc_input)
         
     def forward(self, src: Tensor, mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
@@ -124,8 +125,14 @@ class QuantTransformerEncoderLayer(nn.Module, _utils.QuantMixin):
                                       quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
 
 
+    def save_tmp(self):
+        self._save_tmp = True
+        self.attn.save_tmp()
+
     def forward(self, src: Tensor, src_mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
         src2 = self.attn(src, src, src, attn_mask=src_mask, key_padding_mask=src_key_padding_mask)
+        if hasattr(self, '_save_tmp') and self._save_tmp:
+            torch.save(src2.detach().cpu(), 'tensor_cache/torch_self_attn_output.pt')
         attention_output = self.self_out(src2, src)
         intermediate_output = self.intermediate(attention_output)
         layer_output = self.out(intermediate_output, attention_output)

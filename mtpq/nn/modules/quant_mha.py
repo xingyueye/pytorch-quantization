@@ -63,6 +63,10 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
         self.softmax_input_quantizer = TensorQuantizer(quant_desc_input)
         self._reset_parameters()
 
+    def save_tmp(self):
+        self._save_tmp = True
+        self.out_proj.save_tmp()
+
     def _reset_parameters(self):
         xavier_uniform_(self.q_proj.weight)
         xavier_uniform_(self.k_proj.weight)

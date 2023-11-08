@@ -56,10 +56,16 @@ class QuantLinearFT(nn.Linear, _utils.QuantGemmMixin):
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_features))
 
+    def save_tmp(self):
+        self._save_tmp = True
+
     def forward(self, input):
         quant_input = self._input_quantizer(input)
         quant_weight = self._weight_quantizer(self.weight)
-        output = self._aftergemm_quantizer(F.linear(quant_input, quant_weight, bias=None))
+        output = F.linear(quant_input, quant_weight, bias=None)
+        if hasattr(self, '_save_tmp') and self._save_tmp:
+            torch.save(output.detach().cpu(), 'tensor_cache/torch_attn_before_bias_output.pt')
+        output = self._aftergemm_quantizer(output)
         if self.bias is not None:
             output = output + self.bias
         return output
