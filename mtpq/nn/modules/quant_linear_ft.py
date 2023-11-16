@@ -56,16 +56,24 @@ class QuantLinearFT(nn.Linear, _utils.QuantGemmMixin):
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_features))
 
-    def save_tmp(self):
+    def save_tmp(self, save_prefix=''):
         self._save_tmp = True
+        self._save_prefix = save_prefix
 
     def forward(self, input):
         quant_input = self._input_quantizer(input)
+        if hasattr(self, '_save_tmp') and self._save_tmp:
+            print(f'{self._save_prefix} will save proj after input quant')
+            torch.save(quant_input.detach().cpu(), f'tensor_cache/{self._save_prefix}after_quant_input.pt')
         quant_weight = self._weight_quantizer(self.weight)
         output = F.linear(quant_input, quant_weight, bias=None)
         if hasattr(self, '_save_tmp') and self._save_tmp:
-            torch.save(output.detach().cpu(), 'tensor_cache/torch_attn_before_bias_output.pt')
+            print(f'{self._save_prefix} will save proj before after gemm quant+bias, show input amax: {self._input_quantizer._get_amax(input)}, w amax: {self._weight_quantizer._get_amax(self.weight)}, will out amax: {self._aftergemm_quantizer._get_amax(output)}')
+            torch.save(output.detach().cpu(), f'tensor_cache/{self._save_prefix}before_after_quant.pt')
         output = self._aftergemm_quantizer(output)
+        if hasattr(self, '_save_tmp') and self._save_tmp:
+            print(f'{self._save_prefix} will save proj before bias')
+            torch.save(output.detach().cpu(), f'tensor_cache/{self._save_prefix}before_bias_output.pt')
         if self.bias is not None:
             output = output + self.bias
         return output

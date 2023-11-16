@@ -22,7 +22,7 @@ __all__ = ['construct_quant_transformer_encoder', 'finishing_calibration_transfo
 
 def construct_quant_transformer_encoder(d_model, nhead, num_layers,
                                         dim_feedforward=2048, dropout=0.1, activation=F.relu, layer_norm_eps=1e-5, batch_first=False, 
-                                        encoder_module=None, quant_mode='ft2', quant_config=None):
+                                        encoder_module=None, quant_mode='ft2', quant_config=None, fake_quant=True):
     ft_quant_args = FTQuantArgs(quant_mode=quant_mode)
     
     quant_desc_weight = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR if ft_quant_args.weight_quant_per_tensor else tensor_quant.QUANT_DESC_8BIT_LINEAR_WEIGHT_PER_ROW
@@ -42,6 +42,10 @@ def construct_quant_transformer_encoder(d_model, nhead, num_layers,
             quant_desc_weight = quant_desc['conv_weight_desc']
         if 'output_desc' in quant_desc:
             quant_desc_output = quant_desc['output_desc']
+
+    quant_desc_input._fake_quant = fake_quant
+    quant_desc_weight._fake_quant = fake_quant
+    quant_desc_output._fake_quant = fake_quant
             
     print(f'quant config final: input: {quant_desc_input}, weight: {quant_desc_weight}, output: {quant_desc_output}')
 
@@ -71,8 +75,11 @@ class QuantTransformerEncoder(nn.Module, _utils.QuantMixin):
         super(QuantTransformerEncoder, self).__init__()
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
         self.layers = nn.ModuleList([copy.deepcopy(encoder_layer) for i in range(num_layers)])
-        self.layers[0].save_tmp()
         self.final_input_quantizer = TensorQuantizer(quant_desc_input)
+
+    def save_tmp(self):
+        for i in range(len(self.layers)):
+            self.layers[i].save_tmp(f'torch_quant_encoder_layer_{i}_')
         
     def forward(self, src: Tensor, mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
         output = src
@@ -125,14 +132,15 @@ class QuantTransformerEncoderLayer(nn.Module, _utils.QuantMixin):
                                       quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
 
 
-    def save_tmp(self):
+    def save_tmp(self, save_prefix):
         self._save_tmp = True
-        self.attn.save_tmp()
+        self._save_prefix = save_prefix
+        self.attn.save_tmp(save_prefix)
+        self.intermediate.save_tmp(save_prefix)
+        self.out.save_tmp(save_prefix)
 
     def forward(self, src: Tensor, src_mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
         src2 = self.attn(src, src, src, attn_mask=src_mask, key_padding_mask=src_key_padding_mask)
-        if hasattr(self, '_save_tmp') and self._save_tmp:
-            torch.save(src2.detach().cpu(), 'tensor_cache/torch_self_attn_output.pt')
         attention_output = self.self_out(src2, src)
         intermediate_output = self.intermediate(attention_output)
         layer_output = self.out(intermediate_output, attention_output)
@@ -197,6 +205,11 @@ class QuantIntermediate(nn.Module, _utils.QuantMixin):
         self.proj = QuantLinearFT(hidden_dim, ffn_dim, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
         self.activation = activation
 
+    def save_tmp(self, save_prefix):
+        self._save_tmp = True
+        self._save_prefix = save_prefix
+        self.proj.save_tmp(f'{save_prefix}ffn_linear1_')
+
     def forward(self, hidden_states):
         return self.activation(self.proj(hidden_states))
 
@@ -217,6 +230,11 @@ class QuantEncoderOutput(nn.Module, _utils.QuantMixin):
         self.add_local_input_quantizer = TensorQuantizer(quant_desc_input)
         self.add_residual_input_quantizer = TensorQuantizer(quant_desc_input)
         self.layernorm_input_quantizer = TensorQuantizer(quant_desc_input)
+
+    def save_tmp(self, save_prefix):
+        self._save_tmp = True
+        self._save_prefix = save_prefix
+        self.proj.save_tmp(f'{save_prefix}out_proj_')
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.proj(hidden_states)

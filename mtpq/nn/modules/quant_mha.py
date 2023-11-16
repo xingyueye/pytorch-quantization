@@ -63,9 +63,13 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
         self.softmax_input_quantizer = TensorQuantizer(quant_desc_input)
         self._reset_parameters()
 
-    def save_tmp(self):
+    def save_tmp(self, save_prefix):
         self._save_tmp = True
-        self.out_proj.save_tmp()
+        self._save_prefix = save_prefix
+        self.q_proj.save_tmp(f'{save_prefix}attn_q_proj_')
+        self.k_proj.save_tmp(f'{save_prefix}attn_k_proj_')
+        self.v_proj.save_tmp(f'{save_prefix}attn_v_proj_')
+        self.out_proj.save_tmp(f'{save_prefix}attn_out_proj_')
 
     def _reset_parameters(self):
         xavier_uniform_(self.q_proj.weight)
@@ -157,7 +161,7 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
         # print(f'before qxk, score: {q.shape}, mask: {k.shape}, value: {v.shape}')
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(self.matmul_q_input_quantizer(q),
+        attention_scores = torch.matmul(self.matmul_q_input_quantizer(q), 
                                         self.matmul_k_input_quantizer(k))
         attention_scores = self.softmax_input_quantizer(attention_scores)
 
@@ -174,7 +178,7 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
         if self.training:
             attention_probs = self.dropout(attention_probs)
 
-        attn_output = torch.matmul(self.matmul_a_input_quantizer(attention_probs),
+        attn_output = torch.matmul(self.matmul_a_input_quantizer(attention_probs), 
                                    self.matmul_v_input_quantizer(v))
         
         # attn_output = attn_output.permute(0, 2, 1, 3).contiguous()
