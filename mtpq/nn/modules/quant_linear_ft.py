@@ -48,13 +48,14 @@ class QuantLinearFT(nn.Linear, _utils.QuantGemmMixin):
     default_quant_desc_output = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR
     default_quant_desc_weight = tensor_quant.QUANT_DESC_8BIT_LINEAR_WEIGHT_PER_ROW
 
-    def __init__(self, in_features, out_features, bias=True, **kwargs):
+    def __init__(self, in_features, out_features, bias=True, ft_half=True, **kwargs):
         super(QuantLinearFT, self).__init__(in_features, out_features, False)
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, output_pop=True, **kwargs)
         self.init_quantizer(quant_desc_input, quant_desc_weight, quant_desc_output)
         # self.bias is already registered in nn.Linear
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_features))
+        self._ft_half = ft_half
 
     def save_tmp(self, save_prefix=''):
         self._save_tmp = True
@@ -72,10 +73,15 @@ class QuantLinearFT(nn.Linear, _utils.QuantGemmMixin):
             torch.save(output.detach().cpu(), f'tensor_cache/{self._save_prefix}before_after_quant.pt')
         output = self._aftergemm_quantizer(output)
         if hasattr(self, '_save_tmp') and self._save_tmp:
-            print(f'{self._save_prefix} will save proj before bias')
+            print(f'{self._save_prefix} will save proj before bias, show dtype: input: {input.dtype}, {quant_input.dtype}, weight: {self.weight.dtype}, {quant_weight.dtype}, output: {output.dtype}')
             torch.save(output.detach().cpu(), f'tensor_cache/{self._save_prefix}before_bias_output.pt')
         if self.bias is not None:
-            output = output + self.bias
+            if self._ft_half:
+                if self.bias.dtype==torch.float32:
+                    self.bias.data = self.bias.data.to(torch.float16)
+            output = output + self.bias.to(output.dtype)
+            if hasattr(self, '_save_tmp') and self._save_tmp:
+                torch.save(self.bias, f'tensor_cache/{self._save_prefix}bias.pt')
         return output
 
 LinearFT = QuantLinearFT

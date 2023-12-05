@@ -34,7 +34,7 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
     default_quant_desc_weight = tensor_quant.QUANT_DESC_8BIT_LINEAR_WEIGHT_PER_ROW
     default_quant_desc_output = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR
     
-    def __init__(self, embed_dim, num_heads, dropout=0., bias=True, kdim=None, vdim=None,batch_first=False, **kwargs) -> None:
+    def __init__(self, embed_dim, num_heads, dropout=0., bias=True, kdim=None, vdim=None,batch_first=False, ft_half=True, **kwargs) -> None:
         super(QuantMultiheadAttention, self).__init__()
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
         
@@ -49,10 +49,10 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
                 
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        self.q_proj = QuantLinearFT(embed_dim, embed_dim, bias, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
-        self.k_proj = QuantLinearFT(embed_dim, self.kdim, bias, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
-        self.v_proj = QuantLinearFT(embed_dim, self.vdim, bias, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
-        self.out_proj = QuantLinearFT(embed_dim, embed_dim, bias=bias, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
+        self.q_proj = QuantLinearFT(embed_dim, embed_dim, bias, ft_half=ft_half, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
+        self.k_proj = QuantLinearFT(embed_dim, self.kdim, bias, ft_half=ft_half, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
+        self.v_proj = QuantLinearFT(embed_dim, self.vdim, bias, ft_half=ft_half, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
+        self.out_proj = QuantLinearFT(embed_dim, embed_dim, bias=bias, ft_half=ft_half, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
         
         self.dropout = nn.Dropout(self._dropout_rate)
         
@@ -148,7 +148,7 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
             new_attn_mask = torch.zeros_like(attn_mask, dtype=torch.float)
             new_attn_mask.masked_fill_(attn_mask, float("-inf"))
             attn_mask = new_attn_mask
-        
+        attn_mask = attn_mask.to(q.dtype)
         # q = self.transpose_for_scores(q)
         # k = self.transpose_key_for_scores(k)
         # v = self.transpose_for_scores(v)
@@ -161,25 +161,34 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
         # print(f'before qxk, score: {q.shape}, mask: {k.shape}, value: {v.shape}')
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(self.matmul_q_input_quantizer(q), 
-                                        self.matmul_k_input_quantizer(k))
+        q = self.matmul_q_input_quantizer(q)
+        k = self.matmul_k_input_quantizer(k)
+        v = self.matmul_v_input_quantizer(v)
+        if hasattr(self, '_save_tmp') and self._save_tmp:
+            print(f'{self._save_prefix} will save after qkv quant for mha, show q amax: {self.matmul_q_input_quantizer._get_amax(q)}, k amax: {self.matmul_q_input_quantizer._get_amax(k)}, v amax: {self.matmul_q_input_quantizer._get_amax(v)}')
+            torch.save(q.detach().cpu(), f'tensor_cache/{self._save_prefix}attn_after_q_quant.pt')
+            torch.save(k.detach().cpu(), f'tensor_cache/{self._save_prefix}attn_after_k_quant.pt')
+            torch.save(v.detach().cpu(), f'tensor_cache/{self._save_prefix}attn_after_v_quant.pt')
+
+
+        attention_scores = torch.matmul(q, k)
         attention_scores = self.softmax_input_quantizer(attention_scores)
 
         attention_scores = attention_scores / math.sqrt(self.head_dim)
         # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
         # print(f'before add mask, score: {attention_scores.shape}, mask: {attn_mask.shape}, value: {v.shape}')
         attention_scores = attention_scores + attn_mask
+        # print(f'show quant q dtype: {self.matmul_q_input_quantizer(q).dtype}, quant k dtype: {self.matmul_k_input_quantizer(k).dtype}, attn_mask dtype: {attn_mask.dtype}, attention_scores dtype: {attention_scores.dtype}')
 
         # Normalize the attention scores to probabilities.
         attention_probs = F.softmax(attention_scores, dim=-1)
-
+        # attention_probs = custom_softmax(attention_scores, dim=-1)
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         if self.training:
             attention_probs = self.dropout(attention_probs)
 
-        attn_output = torch.matmul(self.matmul_a_input_quantizer(attention_probs), 
-                                   self.matmul_v_input_quantizer(v))
+        attn_output = torch.matmul(self.matmul_a_input_quantizer(attention_probs), v)
         
         # attn_output = attn_output.permute(0, 2, 1, 3).contiguous()
         # new_shape = attn_output.size()[:-2] + (self.embed_dim,)
@@ -210,3 +219,11 @@ class QuantMultiheadAttention(nn.Module, _utils.QuantMixin):
             out_proj_bias = state_dict.get('out_proj.bias', None)
             if out_proj_bias is not None:
                 self.out_proj.bias.copy_(out_proj_bias)
+
+
+def custom_softmax(x, dim=None):
+    maxes = torch.max(x, dim, keepdim=True)[0]
+    x_exp = torch.exp(x-maxes)
+    x_exp_sum = torch.sum(x_exp, dim, keepdim=True)+ 1e-20
+    output_custom = x_exp/x_exp_sum
+    return output_custom

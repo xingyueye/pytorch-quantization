@@ -21,7 +21,7 @@ from collections import OrderedDict
 __all__ = ['construct_quant_transformer_encoder', 'finishing_calibration_transformer_encoder', 'QuantTransformerEncoder', 'QuantTransformerEncoderLayer']
 
 def construct_quant_transformer_encoder(d_model, nhead, num_layers,
-                                        dim_feedforward=2048, dropout=0.1, activation=F.relu, layer_norm_eps=1e-5, batch_first=False, 
+                                        dim_feedforward=2048, dropout=0.1, activation=F.relu, layer_norm_eps=1e-6, batch_first=False, ft_half=True,
                                         encoder_module=None, quant_mode='ft2', quant_config=None, fake_quant=True):
     ft_quant_args = FTQuantArgs(quant_mode=quant_mode)
     
@@ -49,7 +49,7 @@ def construct_quant_transformer_encoder(d_model, nhead, num_layers,
             
     print(f'quant config final: input: {quant_desc_input}, weight: {quant_desc_weight}, output: {quant_desc_output}')
 
-    q_encoder_layer = QuantTransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation, layer_norm_eps, batch_first, 
+    q_encoder_layer = QuantTransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation, layer_norm_eps, batch_first, ft_half=ft_half,
                                                    quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
     q_encoder = QuantTransformerEncoder(q_encoder_layer, num_layers=num_layers,
                                         quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
@@ -118,17 +118,17 @@ class QuantTransformerEncoderLayer(nn.Module, _utils.QuantMixin):
     default_quant_desc_output = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation=F.relu,
-                 layer_norm_eps=1e-5, batch_first=False, **kwargs) -> None:
+                 layer_norm_eps=1e-6, batch_first=False, ft_half=True, **kwargs) -> None:
         super(QuantTransformerEncoderLayer, self).__init__()
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
         
-        self.attn = QuantMultiheadAttention(d_model, nhead, dropout=dropout, batch_first=batch_first, 
+        self.attn = QuantMultiheadAttention(d_model, nhead, dropout=dropout, batch_first=batch_first, ft_half=ft_half,
                                                  quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
-        self.self_out = QuantSelfOutput(d_model, layer_norm_eps=layer_norm_eps, dropout=dropout,
+        self.self_out = QuantSelfOutput(d_model, layer_norm_eps=layer_norm_eps, dropout=dropout, ft_half=ft_half,
                                         quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
-        self.intermediate = QuantIntermediate(d_model, dim_feedforward, activation,
+        self.intermediate = QuantIntermediate(d_model, dim_feedforward, activation, ft_half=ft_half,
                                               quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
-        self.out = QuantEncoderOutput(dim_feedforward, d_model, layer_norm_eps=layer_norm_eps, drop_rate=dropout,
+        self.out = QuantEncoderOutput(dim_feedforward, d_model, layer_norm_eps=layer_norm_eps, drop_rate=dropout, ft_half=ft_half,
                                       quant_desc_weight=quant_desc_weight, quant_desc_input=quant_desc_input, quant_desc_output=quant_desc_output, output_pop=True)
 
 
@@ -174,10 +174,11 @@ class QuantSelfOutput(nn.Module, _utils.QuantMixin):
     default_quant_desc_weight = tensor_quant.QUANT_DESC_8BIT_LINEAR_WEIGHT_PER_ROW
     default_quant_desc_output = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR
     
-    def __init__(self, embed_dim, layer_norm_eps=1e-5, dropout=0., bias=True, **kwargs):
+    def __init__(self, embed_dim, layer_norm_eps=1e-5, dropout=0., bias=True, ft_half=True, **kwargs):
         super(QuantSelfOutput, self).__init__()
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
-        self.norm = nn.LayerNorm(embed_dim, eps=layer_norm_eps)
+        # self.norm = nn.LayerNorm(embed_dim, eps=layer_norm_eps)
+        self.norm = BertLayerNorm(embed_dim, eps=layer_norm_eps, ft_half=ft_half)
         self.dropout = nn.Dropout(dropout)
 
         self.add_local_input_quantizer = TensorQuantizer(quant_desc_input)
@@ -185,7 +186,8 @@ class QuantSelfOutput(nn.Module, _utils.QuantMixin):
         self.layernorm_input_quantizer = TensorQuantizer(quant_desc_input)
 
     def forward(self, hidden_states, input_tensor):
-        hidden_states = self.dropout(hidden_states)
+        if self.training:
+            hidden_states = self.dropout(hidden_states)
 
         add_local = self.add_local_input_quantizer(hidden_states)
         add_residual = self.add_residual_input_quantizer(input_tensor)
@@ -199,10 +201,10 @@ class QuantIntermediate(nn.Module, _utils.QuantMixin):
     default_quant_desc_weight = tensor_quant.QUANT_DESC_8BIT_LINEAR_WEIGHT_PER_ROW
     default_quant_desc_output = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR
     
-    def __init__(self, hidden_dim, ffn_dim, activation, **kwargs):
+    def __init__(self, hidden_dim, ffn_dim, activation, ft_half=True, **kwargs):
         super(QuantIntermediate, self).__init__()
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
-        self.proj = QuantLinearFT(hidden_dim, ffn_dim, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
+        self.proj = QuantLinearFT(hidden_dim, ffn_dim, ft_half=ft_half, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
         self.activation = activation
 
     def save_tmp(self, save_prefix):
@@ -219,12 +221,13 @@ class QuantEncoderOutput(nn.Module, _utils.QuantMixin):
     default_quant_desc_weight = tensor_quant.QUANT_DESC_8BIT_LINEAR_WEIGHT_PER_ROW
     default_quant_desc_output = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR
     
-    def __init__(self, ffn_dim, hidden_dim, layer_norm_eps=1e-5, drop_rate=0., **kwargs):
+    def __init__(self, ffn_dim, hidden_dim, layer_norm_eps=1e-6, drop_rate=0., ft_half=True, **kwargs):
         super(QuantEncoderOutput, self).__init__()
         quant_desc_input, quant_desc_weight, quant_desc_output = _utils.pop_quant_desc_in_kwargs(self.__class__, **kwargs)
 
         self.proj = QuantLinearFT(ffn_dim, hidden_dim, quant_desc_input=quant_desc_input, quant_desc_weight=quant_desc_weight, quant_desc_output=quant_desc_output)
-        self.norm = nn.LayerNorm(hidden_dim, eps=layer_norm_eps)
+        # self.norm = nn.LayerNorm(hidden_dim, eps=layer_norm_eps)
+        self.norm = BertLayerNorm(hidden_dim, eps=layer_norm_eps, ft_half=ft_half)
         self.dropout = nn.Dropout(drop_rate)
 
         self.add_local_input_quantizer = TensorQuantizer(quant_desc_input)
@@ -246,3 +249,38 @@ class QuantEncoderOutput(nn.Module, _utils.QuantMixin):
         hidden_states = self.norm(lnorm_input)
         return hidden_states
     
+class BertLayerNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-6, ft_half=True):
+        super(BertLayerNorm, self).__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.bias = nn.Parameter(torch.zeros(hidden_size))
+        self._ft_half = ft_half
+    #     self.shape = torch.Size((hidden_size,))
+    #     self.apex_enabled = APEX_IS_AVAILABLE
+
+    # @torch.jit.unused
+    # def fused_layer_norm(self, x):
+    #     return FusedLayerNormAffineFunction.apply(
+    #                 x, self.gamma, self.beta, self.shape, self.eps)
+
+
+    def forward(self, x):
+        # if self.apex_enabled and not torch.jit.is_scripting():
+        #     x = self.fused_layer_norm(x)
+        # else:
+
+        if self._ft_half:
+            if self.weight.dtype==torch.float32:
+                self.weight.data = self.weight.data.to(torch.float16)
+
+            if self.bias.dtype==torch.float32:
+                self.bias.data = self.bias.data.to(torch.float16)
+
+        u = x.mean(-1, keepdim=True)
+        s = (x - u)
+        s = s * s
+        s = s.mean(-1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.eps)
+        x = self.weight.to(x.dtype) * x + self.bias.to(x.dtype)
+        return x
