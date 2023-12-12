@@ -61,15 +61,15 @@ setup(
     tests_require=["pytest"],
 
     install_requires=requirements,
-    ext_modules=[
-        CUDAExtension(
-            name="mtpq.cuda_ext",
-            sources=[os.path.join(abspath, "src/tensor_quant.cpp"),
-                     os.path.join(abspath, "src/tensor_quant_gpu.cu")])
-    ],
-    cmdclass={
-        "build_ext": BuildExtension
-    },
+    # ext_modules=[
+    #     CUDAExtension(
+    #         name="mtpq.cuda_ext",
+    #         sources=[os.path.join(abspath, "src/tensor_quant.cpp"),
+    #                  os.path.join(abspath, "src/tensor_quant_gpu.cu")])
+    # ],
+    # cmdclass={
+    #     "build_ext": BuildExtension
+    # },
     zip_safe=False,
 
     long_description=open("README.md", "r", encoding="utf-8").read(),
